@@ -370,9 +370,10 @@ def scan_jtag_chain():
   proc = subprocess.Popen(['python', 'scan_chain.py'], stdout=subprocess.PIPE)
   out = proc.communicate()[0]
   print 'done.'
-  if out <> defs.JTAG_SCAN:
+  if (out == defs.JTAG_SCAN_CYPRESS) | (out == defs.JTAG_SCAN_RENESAS):
+    print '    JTAG chain succesfully scanned.\n'
+  else:
     raise Exception, ('FATAL: JTAG scan chain not correct: \n\n%s' %out)
-  print '    JTAG chain succesfully scanned.\n'
 
 def load_ppc(mac_file):
   print '    Converting MAC file to urj...',
@@ -402,9 +403,7 @@ def open_ftdi_uart(port, baud):
   return ser
 
 def find_str_ser(serial_obj, string, timeout):
-
-  serial_obj.flushInput()
-  serial_obj.flushOutput()
+  #serial_obj.flushOutput()
   tout = 0
   srch = -1
   buff = '' 
@@ -418,11 +417,12 @@ def find_str_ser(serial_obj, string, timeout):
       buff += res
       srch = buff.find(string)
       tout = 0
-  return buff 
+  if srch == -1:
+    buff = '$#NOT_FOUND$#' + buff
+  return buff
 
 def print_outp_ser(serial_obj, timeout):
-  serial_obj.flushInput()
-  serial_obj.flushOutput()
+  #serial_obj.flushOutput()
   tout = 0
   buff = ''
   while (tout < timeout):
@@ -500,7 +500,8 @@ if __name__ == "__main__":
     9) Test FLASH memory
     0) Load U-boot
     w) Program CPLD
-    e) Run board support package
+    e) Run preliminary DDR3, ZDOK, TGE, 1GE tests
+    r) Test PPC USB host
     q) Quit
     """
     answer = getkey()
@@ -532,8 +533,8 @@ if __name__ == "__main__":
         # open ftdi interface D
         f = open_ftdi_d()
         test_power()
-        scan_jtag_chain()
         program_eeprom(sn)
+        scan_jtag_chain()
 
       finally:
         ftdi.ftdi_usb_close(f)
@@ -591,6 +592,9 @@ if __name__ == "__main__":
         i2c_bus.Close()
     elif '9' in answer:
       try:
+        i2c_bus = open_ftdi_b()
+        f = open_ftdi_d()
+        press_pb('on')
         ser = open_ftdi_uart(ser_port, baud)
         load_ppc('support_files/flashck.mac')
         tout = 0
@@ -612,15 +616,20 @@ if __name__ == "__main__":
         print ''
 
       finally:
+        ftdi.ftdi_usb_close(f)
+        i2c_bus.Close()
         ser.close()
     elif '0' in answer:
       try:
+        i2c_bus = open_ftdi_b()
+        f = open_ftdi_d()
+        press_pb('on')
         ser = open_ftdi_uart(ser_port, baud)
         xio = xtx.Xmodem_tx(ser, defs.UBOOT_PATH, fh)
         load_ppc('support_files/program.mac')
         #load_urj('support_files/clear_reset.urj')
-        ser.flushInput()
-        ser.flushOutput()
+        #ser.flushInput()
+        #ser.flushOutput()
         xio.xmdm_send()
         find_str_ser(ser, 'stop autoboot:', 3)
         ser.write('\n')    
@@ -634,6 +643,8 @@ if __name__ == "__main__":
         print ''
         print ''
       finally:
+        ftdi.ftdi_usb_close(f)
+        i2c_bus.Close()
         ser.close()
     elif 'w' in answer:
       try:
@@ -695,8 +706,49 @@ if __name__ == "__main__":
         for i in range(2):
           ser.write('r2bit zdok %d\n' %i)
           print_outp_ser(ser, 2)
-
-
+        print ''
+        print ''
+      finally:
+        ftdi.ftdi_usb_close(f)
+        i2c_bus.Close()
+        ser.close()
+    elif 'r' in answer:
+      try:
+        i2c_bus = open_ftdi_b()
+        f = open_ftdi_d()
+        ser = open_ftdi_uart(ser_port, baud)
+        print '    Loading roach2_bsp.bin from USB flash drive and programming FPGA.'
+        print ''
+        print ''
+        press_pb('off')
+        press_pb('on')
+        find_str_ser(ser, 'stop autoboot:', 4)
+        ser.write('\n')
+        time.sleep(1)
+        # Scan the USB bus 5 times, u-boot sometimes takes a while to detect the USB drive
+        found = False
+        retry = 0
+        while (not found) & (retry < 5):
+          ser.write('usb start\n')
+          out = find_str_ser(ser, '1 Storage Device(s) found', 3)
+          if out.find('$#NOT_FOUND$#') == -1:
+            found = True
+        if retry == 5:
+          raise Exception ('FATAL: USB flash drive not detected.')
+        ser.write('fatload usb 0 100000 roach2_bsp.bin\n')
+        print ''
+        print ''
+        print 'Reading from USB flash drive, this will take about a minute.'
+        print ''
+        find_str_ser(ser, '19586188 bytes read', 60)
+        time.sleep(0.1)
+        ser.write('r2smap 100000\n')
+        out = find_str_ser(ser, 'info: SelectMAP configuration succeeded', 5)
+        if out.find('$#NOT_FOUND$#') <> -1:
+          raise Exception ('FATAL: USB transfer failed.')
+        print ''
+        print ''
+        print 'USB host working correctly.'
         print ''
         print ''
       finally:
@@ -704,4 +756,4 @@ if __name__ == "__main__":
         i2c_bus.Close()
         ser.close()
     elif 'q' in answer:
-      quit = True
+      quit =  True
