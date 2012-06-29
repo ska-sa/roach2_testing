@@ -1,0 +1,17 @@
+#defs_max6650.py
+
+#I2C command registers
+SPEED = 0x00
+CONFIG = 0x02
+GPIO_DEF = 0x04
+DAC = 0x06
+ALARM_EN = 0x08
+ALARM = 0x0a
+TACH0 = 0x0c
+GPIO_STAT = 0x14
+COUNT = 0x16
+#Constants
+FCLK = 254000.0
+CHASSIS_FAN_MAX = 15000
+FPGA_FAN_MAX = 6000
+

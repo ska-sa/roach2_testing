@@ -1,0 +1,12 @@
+2012-06-28 17:30:13,697 - xmodem - ERROR - protocol error
+2012-06-28 18:49:44,552 - xmodem - ERROR - send ERROR expected NAK/CRC, got 13
+2012-06-28 18:49:44,553 - xmodem - ERROR - send ERROR expected NAK/CRC, got 10
+2012-06-28 18:49:44,553 - xmodem - ERROR - send ERROR expected NAK/CRC, got 120
+2012-06-28 18:49:44,553 - xmodem - ERROR - send ERROR expected NAK/CRC, got 13
+2012-06-28 18:49:44,553 - xmodem - ERROR - send ERROR expected NAK/CRC, got 10
+2012-06-28 18:49:51,122 - xmodem - ERROR - protocol error
+2012-06-28 18:50:29,984 - xmodem - ERROR - send ERROR expected NAK/CRC, got 13
+2012-06-28 18:50:29,984 - xmodem - ERROR - send ERROR expected NAK/CRC, got 10
+2012-06-28 18:50:29,984 - xmodem - ERROR - send ERROR expected NAK/CRC, got 120
+2012-06-28 18:50:29,985 - xmodem - ERROR - send ERROR expected NAK/CRC, got 13
+2012-06-28 18:50:29,985 - xmodem - ERROR - send ERROR expected NAK/CRC, got 10

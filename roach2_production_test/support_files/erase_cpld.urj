@@ -1,0 +1,5 @@
+cable roach-2
+bsdl path support_files/bsdl/ 
+detect
+part 8
+svf support_files/cpld_erase.svf
