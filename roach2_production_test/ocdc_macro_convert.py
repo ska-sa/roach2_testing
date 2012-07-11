@@ -267,7 +267,9 @@ def init_jtag():
   print "cable %s %s"%(URJTAG_PROGRAMMER,URJTAG_PROGRAMMER_PARAMETERS)
   if (BSDL_PATH != "") :
     print "bsdl path %s"%(BSDL_PATH)
+  print "pod RESET=1"
   print "detect"
+  print "frequency 100000"
   print "register R_PPCMODE %d"%(JTAGD_LENGTH)
   print "register R_PPCINST %d"%(JTAGD_LENGTH)
   print "register R_PPCDBGR %d"%(JTAGD_LENGTH)

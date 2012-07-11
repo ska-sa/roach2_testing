@@ -387,13 +387,13 @@ def load_ppc(mac_file):
   print'    Uploading the urj file via JTAG.'
   sys.stdout.flush()
   #subprocess.call(['jtag', 'temp.urj'])
-  proc = subprocess.Popen(['jtag', 'temp.urj'])
+  proc = subprocess.Popen(['jtag', 'temp.urj'], stdout=subprocess.PIPE)
   out = proc.communicate()[0]
 
 def load_urj(urj_file):
   print'    Uploading the urj file via JTAG.'
   sys.stdout.flush()
-  proc = subprocess.Popen(['jtag', urj_file])
+  proc = subprocess.Popen(['jtag', urj_file], stdout=subprocess.PIPE)
   out = proc.communicate()[0]
 
 def open_ftdi_uart(port, baud):
@@ -594,8 +594,10 @@ if __name__ == "__main__":
       try:
         i2c_bus = open_ftdi_b()
         f = open_ftdi_d()
+        press_pb('off')
         press_pb('on')
         ser = open_ftdi_uart(ser_port, baud)
+        print '    Loading flash checking program via JTAG, this will take while...'
         load_ppc('support_files/flashck.mac')
         tout = 0
         buff = []
@@ -623,13 +625,16 @@ if __name__ == "__main__":
       try:
         i2c_bus = open_ftdi_b()
         f = open_ftdi_d()
+        press_pb('off')
         press_pb('on')
         ser = open_ftdi_uart(ser_port, baud)
         xio = xtx.Xmodem_tx(ser, defs.UBOOT_PATH, fh)
+        print '    Loading rinit (PPC Xmodem receiver initilisation program) via JTAG, this will take while...'
         load_ppc('support_files/program.mac')
         #load_urj('support_files/clear_reset.urj')
         #ser.flushInput()
-        #ser.flushOutput()
+        #ser.flushOutput()i
+        print '    Sending U-Boot via Xmodem.'
         xio.xmdm_send()
         find_str_ser(ser, 'stop autoboot:', 3)
         ser.write('\n')    

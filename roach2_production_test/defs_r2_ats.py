@@ -134,7 +134,7 @@ CONFIG_G_BOOT = [0x87, 0x78, 0x52, 0x4e, 0x0d, 0x57, 0xa0, 0x30, 0x40, 0x08, 0x2
 BSDL_PATH = 'support_files/bsdl'
 
 #U-boot path
-UBOOT_PATH = '/home/nfs/boot/u-boot.bin'
+UBOOT_PATH = '/home/nfs/roach2/boot/u-boot.bin'
 
 # Set xilinx source path
 XILINX_SRC_PATH = '/opt/Xilinx/12.4/LabTools/settings64.sh'
