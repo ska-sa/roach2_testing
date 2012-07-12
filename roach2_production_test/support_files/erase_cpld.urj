@@ -1,5 +1,7 @@
 cable roach-2
 bsdl path support_files/bsdl/ 
+pod RESET=1
 detect
+frequency 100000
 part 8
 svf support_files/cpld_erase.svf

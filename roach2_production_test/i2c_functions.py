@@ -1,6 +1,8 @@
 # i2c_functions.py
+import time
 
-def i2c_regwrite(device, i2c_address, register, data):
+
+def i2c_regwrite_raw(device, i2c_address, register, data):
   """Write register on I2C bus.
 
   Keyword arguments:
@@ -32,7 +34,35 @@ def i2c_regwrite(device, i2c_address, register, data):
     raise RuntimeError("Failed to ack data.")
   return "Success" 
 
-def i2c_regread(device, i2c_address, register):
+def i2c_regwrite(device, i2c_address, register, data, retry = 1, backoff = 1):
+  """Write register on I2C bus.
+
+  Keyword arguments:
+  device -- object of type mpsse.MPSSE
+  i2c_address -- 7 bit I2C device address
+  register -- 8 bit register address
+  data -- 8 bit data
+  retry -- number of retries
+  backoff -- time between retries in seconds
+
+  """
+  count = 0
+  success = False
+  while count < retry:
+    try:
+      result = i2c_regwrite_raw(device, i2c_address, register, data)
+      success = True
+      count = retry + 1
+    except RuntimeError as e:
+      print 'I2C write error: %s' %e
+      time.sleep(backoff)
+      count = count + 1
+  if not success:
+    raise RuntimeError('Error: I2C write failed.') 
+  else:
+    return result
+
+def i2c_regread_raw(device, i2c_address, register):
   """Read register on I2C bus.
 
   Keyword arguments:
@@ -60,8 +90,35 @@ def i2c_regread(device, i2c_address, register):
   else:
     raise RuntimeError("Failed to ack read address.")
   return ord(rd_byte)
+
+def i2c_regread(device, i2c_address, register, retry = 5, backoff = 1):
+  """Read register on I2C bus.
+
+  Keyword arguments:
+  device -- object of type mpsse.MPSSE
+  i2c_address -- 7 bit I2C device address
+  register -- 8 bit register address
+  retry -- number of retries
+  backoff -- time between retries in seconds
+
+  """
+  count = 0
+  success = False
+  while count < retry:
+    try:
+      rd_byte = i2c_regread_raw(device, i2c_address, register)
+      success = True
+      count = retry + 1
+    except RuntimeError as e:
+      print 'I2C read error: %s' %e
+      time.sleep(backoff)
+      count = count + 1
+  if not success:
+    raise RuntimeError('Error: I2C read failed.') 
+  else:
+    return rd_byte
   
-def i2c_regread2b(device, i2c_address, register):
+def i2c_regread2b_raw(device, i2c_address, register):
   """Read register twice on I2C bus.
 
   Keyword arguments:
@@ -92,6 +149,34 @@ def i2c_regread2b(device, i2c_address, register):
   else:
     raise RuntimeError("Failed to ack read address.")
   return (ord(rd_byte1), ord(rd_byte2))
+  
+def i2c_regread2b(device, i2c_address, register, retry = 5, backoff = 1):
+  """Read register on I2C bus.
+
+  Keyword arguments:
+  device -- object of type mpsse.MPSSE
+  i2c_address -- 7 bit I2C device address
+  register -- 8 bit register address
+  retry -- number of retries
+  backoff -- time between retries in seconds
+  returns -- two byte array, [0] = first read, [1] = second read
+
+  """
+  count = 0
+  success = False
+  while count < retry:
+    try:
+      rd_byte = i2c_regread2b_raw(device, i2c_address, register)
+      success = True
+      count = retry + 1
+    except RuntimeError as e:
+      print 'I2C read error: %s' %e
+      time.sleep(backoff)
+      count = count + 1
+  if not success:
+    raise RuntimeError('Error: I2C read failed.') 
+  else:
+    return rd_byte
 
 # I2C addresses on ROACH2 bus
 ADDR_PPC_FPGA_TEMP = 0x18
