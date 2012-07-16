@@ -54,7 +54,7 @@ def i2c_regwrite(device, i2c_address, register, data, retry = 2, backoff = 1):
       success = True
       count = retry + 1
     except RuntimeError as e:
-      print 'I2C write error: %s' %e
+      print '\nI2C write error: %s' %e
       time.sleep(backoff)
       count = count + 1
   if not success:
@@ -110,7 +110,7 @@ def i2c_regread(device, i2c_address, register, retry = 2, backoff = 1):
       success = True
       count = retry + 1
     except RuntimeError as e:
-      print 'I2C read error: %s' %e
+      print '\nI2C read error: %s' %e
       time.sleep(backoff)
       count = count + 1
   if not success:
@@ -170,7 +170,7 @@ def i2c_regread2b(device, i2c_address, register, retry = 2, backoff = 1):
       success = True
       count = retry + 1
     except RuntimeError as e:
-      print 'I2C read error: %s' %e
+      print '\nI2C read error: %s' %e
       time.sleep(backoff)
       count = count + 1
   if not success:
