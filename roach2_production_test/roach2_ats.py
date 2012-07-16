@@ -128,7 +128,7 @@ def check_voltages():
   try:
     v_err = []
     for i, v in defs.V_THRESHOLD.iteritems():
-      volts = read_voltage(i[:-2])
+      volts = read_voltage(i[:-2], i2c_bus)
       if i[-1] == 'H':
         if volts > v:
           v_err.append(i)
@@ -147,22 +147,22 @@ def print_v_c():
   except:
     raise
   try:
-    print "    1V0 Monitor: %.3fv" %read_voltage('1V0')
-    print "    1V5 Monitor: %.3fv" %read_voltage('1V5')
-    print "    1V8 Monitor: %.3fv" %read_voltage('1V8')
-    print "    2V5 Monitor: %.3fv" %read_voltage('2V5')
-    print "    3V3 Monitor: %.3fv" %read_voltage('3V3')
-    print "    5V0 Monitor: %.3fv" %read_voltage('5V0')
-    print "    12V Monitor: %.3fv" %read_voltage('12V')
-    print "    3V3 Aux Monitor: %.3fv" %read_voltage('3V3_AUX')
-    print "    12V Monitor (rev1 mod): %.3fv" %(read_voltage('3V3_AUX')*defs_max16071.V_DIV_12V)
-    print "    12V current: %.3fA" %read_ob_current('12V')
-    print "    5V0 current: %.3fA" %read_ob_current('5V')
-    print "    3V3 current: %.3fA" %read_current('3V3')
-    print "    2V5 current: %.3fA" %read_current('2V5')
-    print "    1V8 current: %.3fA" %read_current('1V8')
-    print "    1V5 current: %.3fA" %read_current('1V5')
-    print "    1V0 current: %.3fA" %read_current('1V0')
+    print "    1V0 Monitor: %.3fv" %read_voltage('1V0', i2c_bus)
+    print "    1V5 Monitor: %.3fv" %read_voltage('1V5', i2c_bus)
+    print "    1V8 Monitor: %.3fv" %read_voltage('1V8', i2c_bus)
+    print "    2V5 Monitor: %.3fv" %read_voltage('2V5', i2c_bus)
+    print "    3V3 Monitor: %.3fv" %read_voltage('3V3', i2c_bus)
+    print "    5V0 Monitor: %.3fv" %read_voltage('5V0', i2c_bus)
+    print "    12V Monitor: %.3fv" %read_voltage('12V', i2c_bus)
+    print "    3V3 Aux Monitor: %.3fv" %read_voltage('3V3_AUX', i2c_bus)
+    print "    12V Monitor (rev1 mod): %.3fv" %(read_voltage('3V3_AUX', i2c_bus)*defs_max16071.V_DIV_12V)
+    print "    12V current: %.3fA" %read_ob_current('12V', i2c_bus)
+    print "    5V0 current: %.3fA" %read_ob_current('5V', i2c_bus)
+    print "    3V3 current: %.3fA" %read_current('3V3', i2c_bus)
+    print "    2V5 current: %.3fA" %read_current('2V5', i2c_bus)
+    print "    1V8 current: %.3fA" %read_current('1V8', i2c_bus)
+    print "    1V5 current: %.3fA" %read_current('1V5', i2c_bus)
+    print "    1V0 current: %.3fA" %read_current('1V0', i2c_bus)
     print "    MGT 1.2V Power Good = %d" %read_vmon_gpio('MGT_1V2_PG')
     print "    MGT 1.0V Power Good = %d" %read_vmon_gpio('MGT_1V0_PG')
     print ""
@@ -191,7 +191,7 @@ def check_temps():
   try:
     t_err = []
     for i, v in defs.T_THRESHOLD.iteritems():
-      temp = read_temp(i[:-4])
+      temp = read_temp(i[:-4], i2c_bus)
       if i[-1] == 'H':
         if temp > v:
           t_err.append(i)
@@ -210,10 +210,10 @@ def print_temps():
   except:
     raise
   try:
-    print '    PPC Temp: %d degreesC' %read_temp('PPC')
-    print '    FPGA Temp: %d degreesC' %read_temp('FPGA')
-    print '    Inlet Temp: %0.2f degreesC' %read_temp('INLET')
-    print '    Inlet Temp: %0.2f degreesC' %read_temp('OUTLET')
+    print '    PPC Temp: %d degreesC' %read_temp('PPC', i2c_bus)
+    print '    FPGA Temp: %d degreesC' %read_temp('FPGA', i2c_bus)
+    print '    Inlet Temp: %0.2f degreesC' %read_temp('INLET', i2c_bus)
+    print '    Inlet Temp: %0.2f degreesC' %read_temp('OUTLET', i2c_bus)
     print ''
   finally:
     i2c_bus.Close()
