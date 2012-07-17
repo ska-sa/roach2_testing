@@ -750,7 +750,7 @@ if __name__ == "__main__":
                 done = True
         config_mon();
         test_power()
-        time.sleep(3)
+        time.sleep(5)
         program_eeprom(sn)
         scan_jtag_chain()
         print_menu = True
