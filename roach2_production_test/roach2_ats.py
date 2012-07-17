@@ -1,12 +1,12 @@
 #!/usr/bin/python
 
-import sys, time, select, termios, tty, ftdi, subprocess, serial, logging
+import os, sys, time, select, termios, tty, ftdi, subprocess, serial, logging
 from mpsse import *
 import i2c_functions as iicf
 import xmodem_tx as xtx
 import defs_max16071, defs_max1805, defs_ad7414
 import defs_r2_ats as defs
-
+from bcolours import bcolours as c
 
 def config_mon():
   try:
@@ -218,20 +218,35 @@ def print_temps():
   finally:
     i2c_bus.Close()
 
-#To select menu item without pressing enter
+#To select menu item without pressing enter, a timeout is added so that the menu loop is not blocked.
+def isdata():
+    return select.select([sys.stdin], [], [], 1) == ([sys.stdin], [], [])
+
 def getkey():
   old_settings = termios.tcgetattr(sys.stdin)
-  tty.setraw(sys.stdin.fileno())
-  select.select([sys.stdin], [], [], 0)
-  answer = sys.stdin.read(1)
-  termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-  return answer
+  answer = None
+  try:
+    tty.setraw(sys.stdin.fileno())
+    if isdata():
+      answer = sys.stdin.read(1)
+    return answer
+  finally:
+    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+
+def getkey_block():
+  old_settings = termios.tcgetattr(sys.stdin)
+  try:
+    tty.setraw(sys.stdin.fileno())
+    answer = sys.stdin.read(1)
+    return answer
+  finally:
+    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
 
 def set_serial_number():
-  print "Select manufacturer (default = Digicom):"
+  print "    Select manufacturer (default = Digicom):"
   for i, v in enumerate(defs.MANUF):
     print ("    %d) %s" %(i+1, v))
-  answer = getkey()
+  answer = getkey_block()
   try:
     ans = int(answer)
     if ans in range(1, i+2):
@@ -242,11 +257,11 @@ def set_serial_number():
     manuf = defs.MANUF['Digicom']
   done = False
   while not done:
-    rev = raw_input("Select ROACH2 revision (default = 2): ")
+    rev = raw_input("    Select ROACH2 revision (default = 2): ")
     try:
       rev = int(rev)
       if rev not in range(1,3):
-        print ('Revision %d not supported' %rev)
+        print ('    Revision %d not supported' %rev)
       else:
         done = True
     except ValueError:
@@ -254,26 +269,26 @@ def set_serial_number():
       done = True
   done = False
   while not done:
-    batch = raw_input("Batch Number (0-255): ")
+    batch = raw_input("    Batch Number (0-255): ")
     try:
       batch = int(batch)
       if batch not in range(256):
-        print ('Input valid batch number') 
+        print ('    Input valid batch number') 
       else:
         done = True
     except ValueError:
-      print ('Input valid batch number')
+      print ('    Input valid batch number')
   done = False
   while not done:
-    board = raw_input("Board Number (0-255): ")
+    board = raw_input("    Board Number (0-255): ")
     try:
       board = int(board)
       if board not in range(256):
-        print ('Input valid board number') 
+        print ('    Input valid board number') 
       else:
         done = True
     except ValueError:
-      print ('Input valid board number')
+      print ('    Input valid board number')
   sn = {     
         'manufacturer' : manuf, 
         'type'         : 0x01, 
@@ -438,7 +453,7 @@ def test_power():
       tout = tout + 1
     res = ftdi.ftdi_write_data(f, '\x00', 1)
     if res <> 1:
-      raise Exception('FTDI write ERROR, code: %d' %res)
+      raise Exception('FTDI write ERainOR, code: %d' %res)
     if new_state == curr_state:
       raise Exception, ('FATAL: Power button did not cycle board.')
     print 'done.'
@@ -546,10 +561,9 @@ def press_pb(request):
     pb_dic = {'on' : 1, 'off' : 0}
     curr_state = read_vmon_gpio('ATX_PG')
     if curr_state == pb_dic[request]:
-      print '    Board is currently %s' %request
-      print ''
+      print '\n    Board is currently %s' %request
     else:
-      print '    Switching board %s.' %find_key(pb_dic, not(curr_state))
+      print '\n    Switching board %s.' %find_key(pb_dic, not(curr_state))
       res = ftdi.ftdi_set_bitmode(f, 0x40, ftdi.BITMODE_BITBANG)
       if res <> 0:
         raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
@@ -574,6 +588,8 @@ def press_pb(request):
     ftdi.ftdi_usb_close(f)
 
 if __name__ == "__main__":
+
+  os.system('clear')
 
   sn = defs.SN
   sn_set = False
@@ -618,59 +634,144 @@ if __name__ == "__main__":
   logger.addHandler(fh)
   logger.addHandler(ch)
 
+  # Set default colours
+  DEF_C = {
+    '1':c.ENDC,
+    '2':c.ENDC,
+    '3':c.ENDC,
+    '4':c.ENDC,
+    '5':c.ENDC,
+    '6':c.ENDC,
+    '7':c.ENDC,
+    '8':c.ENDC,
+    '9':c.ENDC,
+    '0':c.ENDC,
+    'w':c.ENDC,
+    'e':c.ENDC,
+    'r':c.ENDC,
+    'q':c.ENDC
+  }
 
+  # print_menu and menu_refresh is used to only reprint the menu when something changes.
+  print_menu = True
+  menu_refresh = False
+  menu_text = 'Main Menu'
+  usb_conn = False
+  # Set default print colours
+  col = DEF_C.copy()
+
+  # Check if serial port present
   while not quit:
+    #The while loop polls keypresses and USB connection status. 
+    #A timeout is added to the keypress function so the loop does not hog the machine, 
+    #this is not elegant but it keeps things simple!
+    #NOTE: the current method may lose keypresses, but it is very unlikely and does not really matter
+    #the user can just press the menu key again, but should still be fixed.
+
+    # Detect USB disconnect, use this signal to reset all flags
+    usb_disc = False
     try:
-      print """Main Menu
-      1) Set serial number for ROACH2
-      2) Power-up tests, JTAG scan and program EEPROM
-      3) Switch board on
-      4) Switch board off
-      5) Print voltages, currents and temperatures
-      6) Scan JTAG chain
-      7) Program EEPROM
-      8) Display EEPROM contents
-      9) Test FLASH memory
-      0) Load U-boot
-      w) Program CPLD
-      e) Run preliminary DDR3, ZDOK, TGE, 1GE tests
-      r) Test PPC USB host
-      q) Quit
-      """
+      with open(ser_port) as f: 
+        usb_conn = True
+    except IOError:
+      # Detect disconnect
+      if usb_conn:
+        usb_conn = False
+        usb_disc = True
+    finally:
+      if usb_conn:
+        f.close()
+
+    try:
+      # Reset colours and flags on USB disconnect
+      if usb_disc:
+        menu_text = 'Main Menu'
+        col = DEF_C.copy()
+        sn_set = False
+        print_menu = True
+        menu_refresh = False
+        os.system('clear')
+
+      # Set menu colours
+      if usb_conn and (not menu_refresh):
+        print_menu = True
+        menu_refresh = True
+        menu_text = 'Main Menu - ' + c.OKGREEN + 'USB connected' + c.ENDC
+      if sn_set:
+        col['1'] = c.OKGREEN
+      
+      if print_menu:
+        manuf_id = sn['manufacturer']
+        manuf_name = find_key(defs.MANUF, manuf_id)
+        print ''
+        print col['1'] + 'Selected serial number:' + c.ENDC
+        print col['1'] + '  Manufacturer ID: %s (%s)' %(chr(manuf_id), manuf_name) + c.ENDC
+        print col['1'] + '  Type: %s (ROACH2)' %sn['type'] + c.ENDC
+        print col['1'] + '  Revision: %s ' %sn['revision'] + c.ENDC
+        print col['1'] + '  Batch: %s ' %sn['batch'] + c.ENDC
+        print col['1'] + '  Board: %s ' %sn['board'] + c.ENDC
+        print ''
+        print menu_text
+        print col['1'] + '    1) Set serial number for ROACH2' + c.ENDC
+        print col['2'] + '    2) Power-up tests, JTAG scan and program EEPROM' + c.ENDC
+        print col['3'] + '    3) Switch board on' + c.ENDC
+        print col['4'] + '    4) Switch board off' + c.ENDC
+        print col['5'] + '    5) Print voltages, currents and temperatures' + c.ENDC
+        print col['6'] + '    6) Scan JTAG chain' + c.ENDC
+        print col['7'] + '    7) Program EEPROM' + c.ENDC
+        print col['8'] + '    8) Display EEPROM contents' + c.ENDC
+        print col['9'] + '    9) Test FLASH memory' + c.ENDC
+        print col['0'] + '    0) Load U-boot' + c.ENDC
+        print col['w'] + '    w) Program CPLD' + c.ENDC
+        print col['e'] + '    e) Run preliminary DDR3, ZDOK, TGE, 1GE tests' + c.ENDC
+        print col['r'] + '    r) Test PPC USB host' + c.ENDC
+        print col['q'] + '    q) Quit' + c.ENDC
       answer = getkey()
-    
+      if answer == None:
+        answer = 'do nothing'
+        print_menu = False
+
       if '1' in answer:
         sn = set_serial_number()
         sn_set = True
+        print_menu = True
       if '2' in answer:
         if not sn_set:
           print '    WARNING: Serial number not set, press \'1\' to set or any key to use default...'
-          answer = getkey()
+          answer = getkey_block()
           if '1' in answer:
             done = False
             while not done:
               sn = set_serial_number()
               print '    Is this correct? Press any key or \'n\' to re-enter serial number.'
-              answer = getkey()
+              answer = getkey_block()
               if 'n' not in answer:
+                sn_set = True
                 done = True
         config_mon();
         test_power()
+        time.sleep(3)
         program_eeprom(sn)
         scan_jtag_chain()
+        print_menu = True
       elif '3' in answer:
         press_pb('on')
+        print_menu = True
       elif '4' in answer:
         press_pb('off')
+        print_menu = True
       elif '5' in answer:
         curr_state = read_vmon_gpio('ATX_PG')
         print '    Current board state is %s.' %state[curr_state]
         print_v_c()
         print_temps()
+        print_menu = True
       elif '6' in answer:
         scan_jtag_chain()
+        print_menu = True
       elif '7' in answer:
         program_eeprom(sn)
+        print_menu = True
       elif '8' in answer:
         try:
           i2c_bus = open_ftdi_b()
@@ -692,6 +793,7 @@ if __name__ == "__main__":
           print''
         finally:
           i2c_bus.Close()
+          print_menu = True
       elif '9' in answer:
         try:
           press_pb('off')
@@ -718,6 +820,7 @@ if __name__ == "__main__":
           print ''
         finally:
           ser.close()
+          print_menu = True
       elif '0' in answer:
         try:
           press_pb('off')
@@ -744,6 +847,7 @@ if __name__ == "__main__":
           print ''
         finally:
           ser.close()
+          print_menu = True
       elif 'w' in answer:
         try:
           ser = open_ftdi_uart(ser_port, baud)
@@ -774,6 +878,7 @@ if __name__ == "__main__":
             raise Exception, ('FATAL: CPLD did not program correctly.')
         finally:
           ser.close()
+          print_menu = True
       elif 'e' in answer:
         try:
           ser = open_ftdi_uart(ser_port, baud)
@@ -805,6 +910,7 @@ if __name__ == "__main__":
           print ''
         finally:
           ser.close()
+          print_menu = True
       elif 'r' in answer:
         try:
           ser = open_ftdi_uart(ser_port, baud)
@@ -844,10 +950,13 @@ if __name__ == "__main__":
           print ''
         finally:
           ser.close()
+          print_menu = True
       elif 'q' in answer:
         quit =  True
     except RuntimeError as e: 
       print e
+      print_menu = True
     except:
       print "ERROR:", sys.exc_info()[0], "Message: ", sys.exc_info()[1]
       print ''
+      print_menu = True
