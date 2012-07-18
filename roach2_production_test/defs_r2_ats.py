@@ -48,8 +48,12 @@ R2_VID = 0x403
 R2_PID = 0x6011
 
 # ATX power supply switch on to PG delay in seconds
-PG_DELAY = 10
-PB_DELAY = 0.5
+PG_DELAY = 0.4
+PB_DELAY = 0.2
+
+# Linux and U-Boot boot delay in seconds
+BOOT_DELAY = 60
+UBOOT_DELAY = 10
 
 # Unconfigured current thresholds
 UC_NOM_C_12V = 0.8 

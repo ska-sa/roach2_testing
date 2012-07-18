@@ -14,16 +14,19 @@ def config_mon():
   except:
     raise
   try:
-    print "        Setting current monitor:"
-    print "        Setting software enable configuration...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_C_MON, defs_max16071.SW_EN_CONF, defs_max16071.SW_EN_CONF_VAL))
-    print "        Setting overcurrent primary threshold and current-sense control...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_C_MON, defs_max16071.OCPT_CSC1, defs_max16071.OCPT_CSC1_VAL))
-    print "        Setting full-scale range for ADCs 1-4...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_C_MON, defs_max16071.ADC_CONF_4321, defs_max16071.ADC_CONF_4321_VAL))
-    print "        Setting full-scale range for ADCs 5-8...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_C_MON, defs_max16071.ADC_CONF_8765, defs_max16071.ADC_CONF_8765_VAL))
-    print "        Setting voltage monitor:"
-    print "        Setting software enable configuration...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_V_MON, defs_max16071.SW_EN_CONF, defs_max16071.SW_EN_CONF_VAL))
-    print "        Setting overcurrent primary threshold and current-sense control...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_V_MON, defs_max16071.OCPT_CSC1, defs_max16071.OCPT_CSC1_VAL))
-    print "        Setting full-scale range for ADCs 1-4...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_V_MON, defs_max16071.ADC_CONF_4321, defs_max16071.ADC_CONF_4321_VAL))
-    print "        Setting full-scale range for ADCs 5-8...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_V_MON, defs_max16071.ADC_CONF_8765, defs_max16071.ADC_CONF_8765_VAL))
+    if check_ppc_i2c():
+      print "        Setting current monitor:"
+      print "        Setting software enable configuration...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_C_MON, defs_max16071.SW_EN_CONF, defs_max16071.SW_EN_CONF_VAL))
+      print "        Setting overcurrent primary threshold and current-sense control...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_C_MON, defs_max16071.OCPT_CSC1, defs_max16071.OCPT_CSC1_VAL))
+      print "        Setting full-scale range for ADCs 1-4...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_C_MON, defs_max16071.ADC_CONF_4321, defs_max16071.ADC_CONF_4321_VAL))
+      print "        Setting full-scale range for ADCs 5-8...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_C_MON, defs_max16071.ADC_CONF_8765, defs_max16071.ADC_CONF_8765_VAL))
+      print "        Setting voltage monitor:"
+      print "        Setting software enable configuration...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_V_MON, defs_max16071.SW_EN_CONF, defs_max16071.SW_EN_CONF_VAL))
+      print "        Setting overcurrent primary threshold and current-sense control...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_V_MON, defs_max16071.OCPT_CSC1, defs_max16071.OCPT_CSC1_VAL))
+      print "        Setting full-scale range for ADCs 1-4...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_V_MON, defs_max16071.ADC_CONF_4321, defs_max16071.ADC_CONF_4321_VAL))
+      print "        Setting full-scale range for ADCs 5-8...",(iicf.i2c_regwrite(i2c_bus, iicf.ADDR_V_MON, defs_max16071.ADC_CONF_8765, defs_max16071.ADC_CONF_8765_VAL))
+    else:
+      raise Exception('ERROR: I2C bus could not be secured from the PPC (check PPC state), current and voltage monitors not set.')
   finally:
     i2c_bus.Close()
 
@@ -82,105 +85,119 @@ def read_ob_current(vbus, i2c_bus):
   return amps
 
 def read_vmon_gpio(gpio):
-  try:
-    i2c_bus = open_ftdi_b()
-  except:
-    raise
-  try:
-    ch = defs.V_MON_GPIO[gpio] - 1
-    addr = iicf.ADDR_V_MON
-    gpio_rd = iicf.i2c_regread(i2c_bus, addr, defs_max16071.GPIO_INPUT_STATE)
-    val = (gpio_rd >> ch) & 0x01
-    return val
-  finally:
-    i2c_bus.Close()
+  if check_ppc_i2c():
+    try:
+      i2c_bus = open_ftdi_b()
+    except:
+      raise
+    try:
+      ch = defs.V_MON_GPIO[gpio] - 1
+      addr = iicf.ADDR_V_MON
+      gpio_rd = iicf.i2c_regread(i2c_bus, addr, defs_max16071.GPIO_INPUT_STATE)
+      val = (gpio_rd >> ch) & 0x01
+    finally:
+      i2c_bus.Close()
+  else:
+    raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), voltage monitor gpio not read.')
+  return val
 
 def check_currents(dic):
-  try:
-    i2c_bus = open_ftdi_b()
-  except:
-    raise
-  try:
-    c_err = []
-    for i, v in dic.iteritems():
-      vbus = i[:-2]
-      if (vbus == '12V') | (vbus == '5V0'):
-        amps = read_ob_current(vbus, i2c_bus)
-      else:
-        amps = read_current(vbus, i2c_bus)
-      if i[-1] == 'H':
-        if amps > v:
-          c_err.append(i)
-          c_err.append(amps)
-      else:
-        if amps < v:
-          c_err.append(i)
-          c_err.append(amps)
-    return c_err
-  finally:
-    i2c_bus.Close()
+  if check_ppc_i2c():
+    try:
+      i2c_bus = open_ftdi_b()
+    except:
+      raise
+    try:
+      c_err = []
+      for i, v in dic.iteritems():
+        vbus = i[:-2]
+        if (vbus == '12V') | (vbus == '5V0'):
+          amps = read_ob_current(vbus, i2c_bus)
+        else:
+          amps = read_current(vbus, i2c_bus)
+        if i[-1] == 'H':
+          if amps > v:
+            c_err.append(i)
+            c_err.append(amps)
+        else:
+          if amps < v:
+            c_err.append(i)
+            c_err.append(amps)
+    finally:
+      i2c_bus.Close()
+  else:
+    raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), currents not read.')
+  return c_err
 
 def check_voltages():
-  try:
-    i2c_bus = open_ftdi_b()
-  except:
-    raise
-  try:
-    v_err = []
-    for i, v in defs.V_THRESHOLD.iteritems():
-      volts = read_voltage(i[:-2], i2c_bus)
-      if i[-1] == 'H':
-        if volts > v:
-          v_err.append(i)
-          v_err.append(volts)
-      else:
-        if volts < v:
-          v_err.append(i)
-          v_err.append(volts)
-    return v_err
-  finally:
-    i2c_bus.Close()
+  if check_ppc_i2c():
+    try:
+      i2c_bus = open_ftdi_b()
+    except:
+      raise
+    try:
+      v_err = []
+      for i, v in defs.V_THRESHOLD.iteritems():
+        volts = read_voltage(i[:-2], i2c_bus)
+        if i[-1] == 'H':
+          if volts > v:
+            v_err.append(i)
+            v_err.append(volts)
+        else:
+          if volts < v:
+            v_err.append(i)
+            v_err.append(volts)
+    finally:
+      i2c_bus.Close()
+  else:
+    raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), voltages not read.')
+  return v_err
 
 def print_v_c():
-  try:
-    i2c_bus = open_ftdi_b()
-  except:
-    raise
-  try:
-    print "    1V0 Monitor: %.3fv" %read_voltage('1V0', i2c_bus)
-    print "    1V5 Monitor: %.3fv" %read_voltage('1V5', i2c_bus)
-    print "    1V8 Monitor: %.3fv" %read_voltage('1V8', i2c_bus)
-    print "    2V5 Monitor: %.3fv" %read_voltage('2V5', i2c_bus)
-    print "    3V3 Monitor: %.3fv" %read_voltage('3V3', i2c_bus)
-    print "    5V0 Monitor: %.3fv" %read_voltage('5V0', i2c_bus)
-    print "    12V Monitor: %.3fv" %read_voltage('12V', i2c_bus)
-    print "    3V3 Aux Monitor: %.3fv" %read_voltage('3V3_AUX', i2c_bus)
-    print "    12V Monitor (rev1 mod): %.3fv" %(read_voltage('3V3_AUX', i2c_bus)*defs_max16071.V_DIV_12V)
-    print "    12V current: %.3fA" %read_ob_current('12V', i2c_bus)
-    print "    5V0 current: %.3fA" %read_ob_current('5V', i2c_bus)
-    print "    3V3 current: %.3fA" %read_current('3V3', i2c_bus)
-    print "    2V5 current: %.3fA" %read_current('2V5', i2c_bus)
-    print "    1V8 current: %.3fA" %read_current('1V8', i2c_bus)
-    print "    1V5 current: %.3fA" %read_current('1V5', i2c_bus)
-    print "    1V0 current: %.3fA" %read_current('1V0', i2c_bus)
-    print "    MGT 1.2V Power Good = %d" %read_vmon_gpio('MGT_1V2_PG')
-    print "    MGT 1.0V Power Good = %d" %read_vmon_gpio('MGT_1V0_PG')
-    print ""
-  finally:
-    i2c_bus.Close()
-
+  if check_ppc_i2c():
+    try:
+      i2c_bus = open_ftdi_b()
+    except:
+      raise
+    try:
+      print "    1V0 Monitor: %.3fv" %read_voltage('1V0', i2c_bus)
+      print "    1V5 Monitor: %.3fv" %read_voltage('1V5', i2c_bus)
+      print "    1V8 Monitor: %.3fv" %read_voltage('1V8', i2c_bus)
+      print "    2V5 Monitor: %.3fv" %read_voltage('2V5', i2c_bus)
+      print "    3V3 Monitor: %.3fv" %read_voltage('3V3', i2c_bus)
+      print "    5V0 Monitor: %.3fv" %read_voltage('5V0', i2c_bus)
+      print "    12V Monitor: %.3fv" %read_voltage('12V', i2c_bus)
+      print "    3V3 Aux Monitor: %.3fv" %read_voltage('3V3_AUX', i2c_bus)
+      print "    12V Monitor (rev1 mod): %.3fv" %(read_voltage('3V3_AUX', i2c_bus)*defs_max16071.V_DIV_12V)
+      print "    12V current: %.3fA" %read_ob_current('12V', i2c_bus)
+      print "    5V0 current: %.3fA" %read_ob_current('5V', i2c_bus)
+      print "    3V3 current: %.3fA" %read_current('3V3', i2c_bus)
+      print "    2V5 current: %.3fA" %read_current('2V5', i2c_bus)
+      print "    1V8 current: %.3fA" %read_current('1V8', i2c_bus)
+      print "    1V5 current: %.3fA" %read_current('1V5', i2c_bus)
+      print "    1V0 current: %.3fA" %read_current('1V0', i2c_bus)
+      print "    MGT 1.2V Power Good = %d" %read_vmon_gpio('MGT_1V2_PG')
+      print "    MGT 1.0V Power Good = %d" %read_vmon_gpio('MGT_1V0_PG')
+      print ""
+    finally:
+      i2c_bus.Close()
+  else:
+    raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), voltages and currents not read.')
 
 def read_temp(sensor, i2c_bus):
-  if sensor == 'PPC':
-    temp = iicf.i2c_regread(i2c_bus, iicf.ADDR_PPC_FPGA_TEMP, defs_max1805.RET1)
-  elif sensor == 'FPGA':
-    temp = iicf.i2c_regread(i2c_bus, iicf.ADDR_PPC_FPGA_TEMP, defs_max1805.RET2)
-  elif sensor == 'INLET':
-    temp_reg = iicf.i2c_regread2b(i2c_bus, iicf.ADDR_INLET_TEMP, defs_ad7414.TEMP)
-    temp = ((temp_reg[0]<<2)+(temp_reg[1]>>6))*0.25
-  elif sensor == 'OUTLET':
-    temp_reg = iicf.i2c_regread2b(i2c_bus, iicf.ADDR_OUTLET_TEMP, defs_ad7414.TEMP)
-    temp = ((temp_reg[0]<<2)+(temp_reg[1]>>6))*0.25
+  if check_ppc_i2c():
+    if sensor == 'PPC':
+      temp = iicf.i2c_regread(i2c_bus, iicf.ADDR_PPC_FPGA_TEMP, defs_max1805.RET1)
+    elif sensor == 'FPGA':
+      temp = iicf.i2c_regread(i2c_bus, iicf.ADDR_PPC_FPGA_TEMP, defs_max1805.RET2)
+    elif sensor == 'INLET':
+      temp_reg = iicf.i2c_regread2b(i2c_bus, iicf.ADDR_INLET_TEMP, defs_ad7414.TEMP)
+      temp = ((temp_reg[0]<<2)+(temp_reg[1]>>6))*0.25
+    elif sensor == 'OUTLET':
+      temp_reg = iicf.i2c_regread2b(i2c_bus, iicf.ADDR_OUTLET_TEMP, defs_ad7414.TEMP)
+      temp = ((temp_reg[0]<<2)+(temp_reg[1]>>6))*0.25
+  else:
+    raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), temperatures not read.')
   return temp
 
 def check_temps():
@@ -310,37 +327,41 @@ def set_serial_number():
 
 
 def program_eeprom(sn):
-  try:
-    i2c_bus = open_ftdi_b()
-  except:
-    raise
-  try:
-    print '    Writing boot parameters for configuration G boot to EEPROM locations 0x00 to 0x0f...',
-    for i, v in enumerate(defs.CONFIG_G_BOOT):
-      iicf.i2c_regwrite(i2c_bus, iicf.ADDR_BOOT_EEPROM_0, i, v)
-      time.sleep(0.005)
-    print 'done.'
-    print '    Writing serial number to EEPROM locations 0x10 to 0x14...',
-    sn_array = []
-    sn_array.append(sn['manufacturer'])
-    sn_array.append(sn['type'])
-    sn_array.append(sn['revision'])
-    sn_array.append(sn['batch'])
-    sn_array.append(sn['board'])
-    for i in range (0x10,0x15):
-      iicf.i2c_regwrite(i2c_bus, iicf.ADDR_BOOT_EEPROM_0, i, sn_array[i - 0x10])
-      time.sleep(0.005)
-    print 'done.'
-    print '    Verifying EEPROM contents...',
-    ver = []
-    for i in range(0x15):
-      ver.append(iicf.i2c_regread(i2c_bus, iicf.ADDR_BOOT_EEPROM_0, i))
-    if (ver[0:0x10] <> defs.CONFIG_G_BOOT) | (ver[0x10:0x15] <> sn_array):
-      raise Exception, ('EEPROM0 contents not read back correctly: \n%s' %ver)
-    print 'done.'
-    print ''
-  finally:
-    i2c_bus.Close()
+  if check_ppc_i2c():
+    try:
+      i2c_bus = open_ftdi_b()
+    except:
+      raise
+    try:
+      print '    Writing boot parameters for configuration G boot to EEPROM locations 0x00 to 0x0f...',
+      for i, v in enumerate(defs.CONFIG_G_BOOT):
+        iicf.i2c_regwrite(i2c_bus, iicf.ADDR_BOOT_EEPROM_0, i, v)
+        time.sleep(0.005)
+      print 'done.'
+      print '    Writing serial number to EEPROM locations 0x10 to 0x14...',
+      sn_array = []
+      sn_array.append(sn['manufacturer'])
+      sn_array.append(sn['type'])
+      sn_array.append(sn['revision'])
+      sn_array.append(sn['batch'])
+      sn_array.append(sn['board'])
+      for i in range (0x10,0x15):
+        iicf.i2c_regwrite(i2c_bus, iicf.ADDR_BOOT_EEPROM_0, i, sn_array[i - 0x10])
+        time.sleep(0.005)
+      print 'done.'
+      print '    Verifying EEPROM contents...',
+      ver = []
+      for i in range(0x15):
+        ver.append(iicf.i2c_regread(i2c_bus, iicf.ADDR_BOOT_EEPROM_0, i))
+      if (ver[0:0x10] <> defs.CONFIG_G_BOOT) | (ver[0x10:0x15] <> sn_array):
+        raise Exception, ('EEPROM0 contents not read back correctly: \n%s' %ver)
+      print 'done.'
+      print ''
+    finally:
+      i2c_bus.Close()
+  else:
+    raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), EEPROM write not done.')
+
 
 def find_key(dic, val):
     """return the key of dictionary dic given the value"""
@@ -518,7 +539,7 @@ def open_ftdi_uart(port, baud):
     print '\nERROR: Serial port could not be opened, check USB connection.'
     raise
 
-def find_str_ser(serial_obj, string, timeout):
+def find_str_ser(serial_obj, string, timeout, display = True):
   #serial_obj.flushOutput()
   tout = 0
   srch = -1
@@ -528,14 +549,16 @@ def find_str_ser(serial_obj, string, timeout):
     if res == '':
       tout = tout + 1
     else:
-      sys.stdout.write(res)
-      sys.stdout.flush()
+      if display:
+        sys.stdout.write(res)
+        sys.stdout.flush()
       buff += res
       srch = buff.find(string)
       tout = 0
   if srch == -1:
-    buff = '$#NOT_FOUND$#' + buff
-  return buff
+    return False
+  else:
+    return True
 
 def print_outp_ser(serial_obj, timeout):
   #serial_obj.flushOutput()
@@ -551,6 +574,37 @@ def print_outp_ser(serial_obj, timeout):
       buff += res
       tout = 0
   return buff    
+
+# The I2C bus has 2 masters, FTDI and PPC. This method will check the state of the PPC and wait till it has released the I2C bus.
+# This method opens a serial port object, if the serial port is already open that object wont be affected. 
+def check_ppc_i2c():
+  try:
+    serial_obj = open_ftdi_uart(ser_port, baud)
+  except:
+    raise
+  try:
+    i2c_avbl = False
+    if find_str_ser(serial_obj, 'U-Boot', 1):
+      if find_str_ser(serial_obj, 'stop autoboot:', defs.UBOOT_DELAY):
+        serial_obj.write('\n')
+        i2c_avbl = True
+      else:
+        raise Exception('ERROR: U-Boot did not load correctly during checking that the PPC released the I2C bus.')
+    else:
+      tout = 0
+      while (not i2c_avbl) and (tout < defs.BOOT_DELAY):
+        serial_obj.write('\n')
+        if find_str_ser(serial_obj, '=>', 1):
+          i2c_avbl = True
+        else:
+          serial_obj.write('\n')
+          if find_str_ser(serial_obj, 'login:', 1):
+            i2c_avbl = True
+        tout += 2 #If none of the two strings are found the loop will take 2 seconds (serial timeout is set to 1 seconds).
+    print c.FAIL + 'RETURNINGGKJSDFLKJ' + c.ENDC
+    return i2c_avbl
+  finally:
+    serial_obj.close()
 
 def press_pb(request):
   try:
@@ -649,7 +703,8 @@ if __name__ == "__main__":
     'w':c.ENDC,
     'e':c.ENDC,
     'r':c.ENDC,
-    'q':c.ENDC
+    'q':c.ENDC,
+    'm':c.ENDC
   }
 
   # print_menu and menu_refresh is used to only reprint the menu when something changes.
@@ -725,6 +780,7 @@ if __name__ == "__main__":
         print col['w'] + '    w) Program CPLD' + c.ENDC
         print col['e'] + '    e) Run preliminary DDR3, ZDOK, TGE, 1GE tests' + c.ENDC
         print col['r'] + '    r) Test PPC USB host' + c.ENDC
+        print col['m'] + '    m) Unload U-Boot (if U-Boot does not start correctly and holds the I2C bus).' + c.ENDC
         print col['q'] + '    q) Quit' + c.ENDC
       answer = getkey()
       if answer == None:
@@ -773,27 +829,30 @@ if __name__ == "__main__":
         program_eeprom(sn)
         print_menu = True
       elif '8' in answer:
-        try:
-          i2c_bus = open_ftdi_b()
-        except:
-          raise
-        try:
-          print ('\n\nEEPROM at 0x%02x' %iicf.ADDR_BOOT_EEPROM_0)
-          for i in range (256):
-            if (i % 0x10 == 0):
-              print('\n0x%02x' %i),
-            print ('%02x' %(iicf.i2c_regread(i2c_bus, iicf.ADDR_BOOT_EEPROM_0, i))),
+        if check_ppc_i2c():
+          try:
+            i2c_bus = open_ftdi_b()
+          except:
+            raise
+          try:
+            print ('\n\nEEPROM at 0x%02x' %iicf.ADDR_BOOT_EEPROM_0)
+            for i in range (256):
+              if (i % 0x10 == 0):
+                print('\n0x%02x' %i),
+              print ('%02x' %(iicf.i2c_regread(i2c_bus, iicf.ADDR_BOOT_EEPROM_0, i))),
 
-          print ('\n\nEEPROM at 0x%02x' %iicf.ADDR_BOOT_EEPROM_1)
-          for i in range (256):
-            if (i % 0x10 == 0):
-              print('\n0x%02x' %i),
-            print ('%02x' %(iicf.i2c_regread(i2c_bus, iicf.ADDR_BOOT_EEPROM_1, i))),
-          print''
-          print''
-        finally:
-          i2c_bus.Close()
-          print_menu = True
+            print ('\n\nEEPROM at 0x%02x' %iicf.ADDR_BOOT_EEPROM_1)
+            for i in range (256):
+              if (i % 0x10 == 0):
+                print('\n0x%02x' %i),
+              print ('%02x' %(iicf.i2c_regread(i2c_bus, iicf.ADDR_BOOT_EEPROM_1, i))),
+            print''
+            print''
+          finally:
+            i2c_bus.Close()
+            print_menu = True
+        else:
+          raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), EEPROM contents not read.')
       elif '9' in answer:
         try:
           press_pb('off')
@@ -834,12 +893,12 @@ if __name__ == "__main__":
           #ser.flushOutput()i
           print '    Sending U-Boot via Xmodem.'
           xio.xmdm_send()
-          find_str_ser(ser, 'stop autoboot:', 3)
+          find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)
           ser.write('\n')    
           ser.write('run clearenv\n')
           print_outp_ser(ser, 1)
           ser.write('reset\n')
-          find_str_ser(ser, 'stop autoboot:', 1)
+          find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)
           ser.write('\n')
           ser.write('saveenv\n')
           print_outp_ser(ser, 1)
@@ -867,7 +926,7 @@ if __name__ == "__main__":
           print ''
           press_pb('off')
           press_pb('on')
-          find_str_ser(ser, 'stop autoboot:', 3)
+          find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)
           ser.write('\n')
           time.sleep(1)
           # read data from CPLD to see if it programmed correctly  
@@ -884,7 +943,7 @@ if __name__ == "__main__":
           ser = open_ftdi_uart(ser_port, baud)
           press_pb('off')
           press_pb('on')
-          find_str_ser(ser, 'stop autoboot:', 3)
+          find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)
           ser.write('\n')
           time.sleep(0.5)
           ser.write('dhcp\n')
@@ -919,7 +978,7 @@ if __name__ == "__main__":
           print ''
           press_pb('off')
           press_pb('on')
-          find_str_ser(ser, 'stop autoboot:', 4)
+          find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)
           ser.write('\n')
           time.sleep(1)
           # Scan the USB bus 5 times, u-boot sometimes takes a while to detect the USB drive
@@ -951,6 +1010,14 @@ if __name__ == "__main__":
         finally:
           ser.close()
           print_menu = True
+      elif 'm' in answer:
+        press_pb('off')
+        press_pb('on')
+        print '    Unloading U-Boot via JTAG, this will take while...'
+        load_ppc('support_files/program.mac')
+        print '    Done.'
+        print ''
+        print_menu = True
       elif 'q' in answer:
         quit =  True
     except RuntimeError as e: 
