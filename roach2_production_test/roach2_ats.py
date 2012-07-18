@@ -277,7 +277,7 @@ def set_serial_number():
     manuf = defs.MANUF['Digicom']
   done = False
   while not done:
-    rev = raw_input("    Select ROACH2 revision (default = 2): ")
+    rev = raw_input("    Select ROACH2 revision (default = 1): ")
     try:
       rev = int(rev)
       if rev not in range(1,3):
@@ -285,7 +285,7 @@ def set_serial_number():
       else:
         done = True
     except ValueError:
-      rev = 2
+      rev = 1
       done = True
   done = False
   while not done:
@@ -520,17 +520,19 @@ def load_ppc(mac_file):
   outfile.write(out)
   outfile.close()
   print 'done.'
-  print'    Uploading the urj file via JTAG.'
+  print '    Uploading the urj file via JTAG...',
   sys.stdout.flush()
   #subprocess.call(['jtag', 'temp.urj'])
   proc = subprocess.Popen(['jtag', 'temp.urj'], stdout=subprocess.PIPE)
   out = proc.communicate()[0]
+  print 'done.'
 
 def load_urj(urj_file):
-  print'    Uploading the urj file via JTAG.'
+  print '    Uploading the urj file via JTAG...',
   sys.stdout.flush()
   proc = subprocess.Popen(['jtag', urj_file], stdout=subprocess.PIPE)
   out = proc.communicate()[0]
+  print 'done.'
 
 def open_ftdi_uart(port, baud, timeout = 1):
   try:
@@ -559,10 +561,8 @@ def find_str_ser(serial_obj, string, timeout, display = True):
       srch = buff.find(string)
       tout = 0
   if srch == -1:
-    print 'retrunting'
     return False
   else:
-    print 'returning'
     return True
 
 def print_outp_ser(serial_obj, timeout):
@@ -614,6 +614,8 @@ def check_ppc_i2c():
       i2c_avbl = True
     return i2c_avbl
   finally:
+    serial_obj.flushInput()
+    serial_obj.flushOutput()
     serial_obj.close()
 
 def press_pb(request):
@@ -625,9 +627,9 @@ def press_pb(request):
     pb_dic = {'on' : 1, 'off' : 0}
     curr_state = read_vmon_gpio('ATX_PG')
     if curr_state == pb_dic[request]:
-      print '\n    Board is currently %s' %request
+      print '    Board is currently %s' %request
     else:
-      print '\n    Switching board %s.' %find_key(pb_dic, not(curr_state))
+      print '    Switching board %s.' %find_key(pb_dic, not(curr_state))
       res = ftdi.ftdi_set_bitmode(f, 0x40, ftdi.BITMODE_BITBANG)
       if res <> 0:
         raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
@@ -644,7 +646,6 @@ def press_pb(request):
       res = ftdi.ftdi_write_data(f, '\x00', 1)
       if res <> 1:
         raise Exception('FTDI write ERROR, code: %d' %res)
-      print ''
       time.sleep(0.5)
       if tout == 10:
         raise Exception, ('Power button did not have an effect.')
@@ -656,7 +657,6 @@ if __name__ == "__main__":
   os.system('clear')
 
   sn = defs.SN
-  sn_set = False
   ser_port = '/dev/ttyUSB2'
   baud = 115200
   state = ['off', 'on']
@@ -678,8 +678,6 @@ if __name__ == "__main__":
     -9 : 'get serial number failed',
     -10: 'unable to close device'
   }
-
-  quit = False
 
   # create logger
   logger = logging.getLogger('r2_ats')
@@ -717,11 +715,25 @@ if __name__ == "__main__":
     'm':c.ENDC
   }
 
+  # Set menu flags
+  usb_conn = False
+  sn_set = False
+  power_test = False
+  pb_on = False
+  pb_off = False
+  print_vc = False
+  scan_jtag = False
+  prog_eeprom = False
+  read_eeprom = False
+  flash_chk = False
+  uboot_load = False
+  cpld_done = False
+  quit = False
+
   # print_menu and menu_refresh is used to only reprint the menu when something changes.
   print_menu = True
   menu_refresh = False
   menu_text = 'Main Menu'
-  usb_conn = False
   # Set default print colours
   col = DEF_C.copy()
 
@@ -750,9 +762,19 @@ if __name__ == "__main__":
     try:
       # Reset colours and flags on USB disconnect
       if usb_disc:
-        menu_text = 'Main Menu'
+        menu_text = 'Main Menu - ' + c.WARNING + 'USB connected' + c.ENDC
         col = DEF_C.copy()
         sn_set = False
+        power_teset = False
+        pb_on = False
+        pb_off = False
+        print_vc = False
+        scan_jtag = False
+        prog_eeprom = False
+        read_eeprom = False
+        flash_shk = False
+        uboot_load = False
+        cpld_done = False
         print_menu = True
         menu_refresh = False
         os.system('clear')
@@ -764,6 +786,26 @@ if __name__ == "__main__":
         menu_text = 'Main Menu - ' + c.OKGREEN + 'USB connected' + c.ENDC
       if sn_set:
         col['1'] = c.OKGREEN
+      if power_test:
+        col['2'] = c.OKGREEN
+      if pb_on:
+        col['3'] = c.OKGREEN
+      if pb_off:
+        col['4'] = c.OKGREEN
+      if print_vc:
+        col['5'] = c.OKGREEN
+      if scan_jtag:
+        col['6'] = c.OKGREEN
+      if prog_eeprom:
+        col['7'] = c.OKGREEN
+      if read_eeprom:
+        col['8'] = c.OKGREEN
+      if flash_chk:
+        col['9'] = c.OKGREEN
+      if uboot_load:
+        col['0'] = c.OKGREEN
+      if cpld_done:
+        col['w'] = c.OKGREEN
       
       if print_menu:
         manuf_id = sn['manufacturer']
@@ -796,12 +838,21 @@ if __name__ == "__main__":
       if answer == None:
         answer = 'do nothing'
         print_menu = False
+      else:
+        # Set menu colour to fail, will be set to pass if tests pass.
+        try:
+          col[answer] = c.FAIL
+        except KeyError:
+          print_menu = True
 
       if '1' in answer:
+        sn_set = False
         sn = set_serial_number()
         sn_set = True
         print_menu = True
       if '2' in answer:
+        print c.OKBLUE + '\n    Testing power, configuring EEPROM and scanning JTAG chain' + c.ENDC
+        power_test = False
         if not sn_set:
           print '    WARNING: Serial number not set, press \'1\' to set or any key to use default...'
           answer = getkey_block()
@@ -816,29 +867,43 @@ if __name__ == "__main__":
                 done = True
         config_mon();
         test_power()
-        time.sleep(5)
         program_eeprom(sn)
         scan_jtag_chain()
+        power_test = True
         print_menu = True
       elif '3' in answer:
+        print ''
+        pb_on = False
         press_pb('on')
+        pb_on = True
         print_menu = True
       elif '4' in answer:
+        print ''
+        pb_off = False
         press_pb('off')
+        pb_off = True
         print_menu = True
       elif '5' in answer:
+        print_vc = False
         curr_state = read_vmon_gpio('ATX_PG')
-        print '    Current board state is %s.' %state[curr_state]
+        print c.OKBLUE + ('\n    Current board state is %s.' %state[curr_state]) + c.ENDC
         print_v_c()
         print_temps()
+        print_vc = True
         print_menu = True
       elif '6' in answer:
+        scan_jtag = False
+        print ''
         scan_jtag_chain()
         print_menu = True
+        scan_jtag = True
       elif '7' in answer:
+        prog_eeprom = False
         program_eeprom(sn)
+        prog_eeprom = True
         print_menu = True
       elif '8' in answer:
+        read_eeprom = False
         if check_ppc_i2c():
           try:
             i2c_bus = open_ftdi_b()
@@ -858,16 +923,22 @@ if __name__ == "__main__":
               print ('%02x' %(iicf.i2c_regread(i2c_bus, iicf.ADDR_BOOT_EEPROM_1, i))),
             print''
             print''
+            read_eeprom = True
           finally:
             i2c_bus.Close()
             print_menu = True
         else:
           raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), EEPROM contents not read.')
       elif '9' in answer:
+        print c.OKBLUE + ('\n    Checking FLASH memory.') + c.ENDC
         try:
+          ser = open_ftdi_uart(ser_port, baud)
+        except:
+          raise
+        try:
+          flash_chk = False
           press_pb('off')
           press_pb('on')
-          ser = open_ftdi_uart(ser_port, baud)
           print '    Loading flash checking program via JTAG, this will take while...'
           load_ppc('support_files/flashck.mac')
           tout = 0
@@ -886,15 +957,20 @@ if __name__ == "__main__":
             raise Exception, ('FATAL: FLASH memory test failed.')
           print 'FLASH memory test passed.'
           print ''
-          print ''
+          flash_chk = True
         finally:
           ser.close()
           print_menu = True
       elif '0' in answer:
+        print c.OKBLUE + ('\n    Loading U-Boot.') + c.ENDC
         try:
+          ser = open_ftdi_uart(ser_port, baud)
+        except:
+          raise
+        try:
+          uboot_load = False
           press_pb('off')
           press_pb('on')
-          ser = open_ftdi_uart(ser_port, baud)
           xio = xtx.Xmodem_tx(ser, defs.UBOOT_PATH, fh)
           print '    Loading rinit (PPC Xmodem receiver initilisation program) via JTAG, this will take while...'
           load_ppc('support_files/program.mac')
@@ -903,17 +979,19 @@ if __name__ == "__main__":
           #ser.flushOutput()i
           print '    Sending U-Boot via Xmodem.'
           xio.xmdm_send()
-          find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)
-          ser.write('\n')    
+          if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY):
+            raise  Exception('FATAL: U-Boot did not boot after x-modem transfer.')
+          ser.write('\n')
           ser.write('run clearenv\n')
           print_outp_ser(ser, 1)
           ser.write('reset\n')
-          find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)
+          if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY):
+            raise  Exception('FATAL: U-Boot did not boot after reset.')
           ser.write('\n')
           ser.write('saveenv\n')
           print_outp_ser(ser, 1)
           print ''
-          print ''
+          uboot_load = True
         finally:
           ser.close()
           print_menu = True
@@ -923,29 +1001,27 @@ if __name__ == "__main__":
         except:
           raise
         try:
+          cpld_done = False
           ser.flushInput()
           ser.flushOutput()
+          print c.OKBLUE + '\n    Programming CPLD.' + c.ENDC
           press_pb('on')
           print '    Erasing CPLD...',
           load_urj('support_files/erase_cpld.urj')
-          print 'done.'
           print '    Programming CPLD...',
           load_urj('support_files/program_cpld.urj')
-          print 'done.'
-          print ''
-          print ''
           press_pb('off')
           press_pb('on')
-          find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)
           ser.write('\n')
-          print 'sleeping for a second'
-          time.sleep(1)
-          # read data from CPLD to see if it programmed correctly  
+          if not find_str_ser(ser, '=>', 1, False):
+            raise Exception('ERROR: U-Boot did not load correctly after powerup.')
+          print '    Dumping CPLD mapped memory to confirm CPLD configuration.'  
           ser.write('md 0xc0000000 8\n')
           out = print_outp_ser(ser, 1)
           print ''
           if out.find(defs.CPLD_MD) == -1:
             raise Exception, ('FATAL: CPLD did not program correctly.')
+          cpld_done = True
         finally:
           ser.close()
           print_menu = True
