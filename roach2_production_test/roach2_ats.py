@@ -587,8 +587,8 @@ def check_ppc_i2c():
     raise
   try:
     i2c_avbl = False
-    if find_str_ser(serial_obj, 'U-Boot', 1):
-      if find_str_ser(serial_obj, 'stop autoboot:', defs.UBOOT_DELAY):
+    if find_str_ser(serial_obj, 'U-Boot', 1, False):
+      if find_str_ser(serial_obj, 'stop autoboot:', defs.UBOOT_DELAY, False):
         serial_obj.write('\n')
         i2c_avbl = True
       else:
@@ -597,14 +597,13 @@ def check_ppc_i2c():
       tout = 0
       while (not i2c_avbl) and (tout < defs.BOOT_DELAY):
         serial_obj.write('\n')
-        if find_str_ser(serial_obj, '=>', 1):
+        if find_str_ser(serial_obj, '=>', 1, False):
           i2c_avbl = True
         else:
           serial_obj.write('\n')
-          if find_str_ser(serial_obj, 'login:', 1):
+          if find_str_ser(serial_obj, 'login:', 1, False):
             i2c_avbl = True
         tout += 2 #If none of the two strings are found the loop will take 2 seconds (serial timeout is set to 1 seconds).
-    print c.FAIL + 'RETURNINGGKJSDFLKJ' + c.ENDC
     return i2c_avbl
   finally:
     serial_obj.close()
