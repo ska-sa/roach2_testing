@@ -532,9 +532,9 @@ def load_urj(urj_file):
   proc = subprocess.Popen(['jtag', urj_file], stdout=subprocess.PIPE)
   out = proc.communicate()[0]
 
-def open_ftdi_uart(port, baud):
+def open_ftdi_uart(port, baud, timeout = 1):
   try:
-    ser = serial.Serial(port, baud, timeout=1)
+    ser = serial.Serial(port, baud, timeout = timeout)
     ser.flushInput()
     ser.flushOutput()
     return ser
@@ -559,8 +559,10 @@ def find_str_ser(serial_obj, string, timeout, display = True):
       srch = buff.find(string)
       tout = 0
   if srch == -1:
+    print 'retrunting'
     return False
   else:
+    print 'returning'
     return True
 
 def print_outp_ser(serial_obj, timeout):
@@ -582,28 +584,34 @@ def print_outp_ser(serial_obj, timeout):
 # This method opens a serial port object, if the serial port is already open that object wont be affected. 
 def check_ppc_i2c():
   try:
-    serial_obj = open_ftdi_uart(ser_port, baud)
+    serial_obj = open_ftdi_uart(ser_port, baud, 0.1)
   except:
     raise
   try:
     i2c_avbl = False
-    if find_str_ser(serial_obj, 'U-Boot', 1, False):
-      if find_str_ser(serial_obj, 'stop autoboot:', defs.UBOOT_DELAY, False):
+    if find_str_ser(serial_obj, 'DRAM:', 4, False):
+      if find_str_ser(serial_obj, 'stop autoboot:', defs.UBOOT_DELAY*10, False):
         serial_obj.write('\n')
         i2c_avbl = True
       else:
         raise Exception('ERROR: U-Boot did not load correctly during checking that the PPC released the I2C bus.')
-    else:
+    # Check if there is activity on the serial port, if so Linux is booting.
+    elif (len(serial_obj.read(20)) > 0):
       tout = 0
-      while (not i2c_avbl) and (tout < defs.BOOT_DELAY):
+      while (not i2c_avbl) and (tout < defs.BOOT_DELAY*10):
         serial_obj.write('\n')
         if find_str_ser(serial_obj, '=>', 1, False):
           i2c_avbl = True
         else:
+          print '    Waiting for Linux to boot, this will take some time.' 
           serial_obj.write('\n')
           if find_str_ser(serial_obj, 'login:', 1, False):
             i2c_avbl = True
-        tout += 2 #If none of the two strings are found the loop will take 2 seconds (serial timeout is set to 1 seconds).
+        tout += 1
+      if not i2c_avbl:
+        raise Exception('ERROR: Timed out waiting for Linux to boot.')
+    else:
+      i2c_avbl = True
     return i2c_avbl
   finally:
     serial_obj.close()
@@ -930,6 +938,7 @@ if __name__ == "__main__":
           press_pb('on')
           find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)
           ser.write('\n')
+          print 'sleeping for a second'
           time.sleep(1)
           # read data from CPLD to see if it programmed correctly  
           ser.write('md 0xc0000000 8\n')
