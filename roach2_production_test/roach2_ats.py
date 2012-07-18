@@ -185,55 +185,58 @@ def print_v_c():
     raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), voltages and currents not read.')
 
 def read_temp(sensor, i2c_bus):
-  if check_ppc_i2c():
-    if sensor == 'PPC':
-      temp = iicf.i2c_regread(i2c_bus, iicf.ADDR_PPC_FPGA_TEMP, defs_max1805.RET1)
-    elif sensor == 'FPGA':
-      temp = iicf.i2c_regread(i2c_bus, iicf.ADDR_PPC_FPGA_TEMP, defs_max1805.RET2)
-    elif sensor == 'INLET':
-      temp_reg = iicf.i2c_regread2b(i2c_bus, iicf.ADDR_INLET_TEMP, defs_ad7414.TEMP)
-      temp = ((temp_reg[0]<<2)+(temp_reg[1]>>6))*0.25
-    elif sensor == 'OUTLET':
-      temp_reg = iicf.i2c_regread2b(i2c_bus, iicf.ADDR_OUTLET_TEMP, defs_ad7414.TEMP)
-      temp = ((temp_reg[0]<<2)+(temp_reg[1]>>6))*0.25
-  else:
-    raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), temperatures not read.')
+  if sensor == 'PPC':
+    temp = iicf.i2c_regread(i2c_bus, iicf.ADDR_PPC_FPGA_TEMP, defs_max1805.RET1)
+  elif sensor == 'FPGA':
+    temp = iicf.i2c_regread(i2c_bus, iicf.ADDR_PPC_FPGA_TEMP, defs_max1805.RET2)
+  elif sensor == 'INLET':
+    temp_reg = iicf.i2c_regread2b(i2c_bus, iicf.ADDR_INLET_TEMP, defs_ad7414.TEMP)
+    temp = ((temp_reg[0]<<2)+(temp_reg[1]>>6))*0.25
+  elif sensor == 'OUTLET':
+    temp_reg = iicf.i2c_regread2b(i2c_bus, iicf.ADDR_OUTLET_TEMP, defs_ad7414.TEMP)
+    temp = ((temp_reg[0]<<2)+(temp_reg[1]>>6))*0.25
   return temp
 
 def check_temps():
-  try:
-    i2c_bus = open_ftdi_b()
-  except:
-    raise
-  try:
-    t_err = []
-    for i, v in defs.T_THRESHOLD.iteritems():
-      temp = read_temp(i[:-4], i2c_bus)
-      if i[-1] == 'H':
-        if temp > v:
-          t_err.append(i)
-          t_err.append(temp)
-      else:
-        if temp < v:
-          t_err.append(i)
-          t_err.append(temp)
-    return t_err
-  finally:
-    i2c_bus.Close()
-  
+  if check_ppc_i2c():
+    try:
+      i2c_bus = open_ftdi_b()
+    except:
+      raise
+    try:
+      t_err = []
+      for i, v in defs.T_THRESHOLD.iteritems():
+        temp = read_temp(i[:-4], i2c_bus)
+        if i[-1] == 'H':
+          if temp > v:
+            t_err.append(i)
+            t_err.append(temp)
+        else:
+          if temp < v:
+            t_err.append(i)
+            t_err.append(temp)
+    finally:
+      i2c_bus.Close()
+  else:
+    raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), temperatures not read.')
+  return t_err
+
 def print_temps():
-  try:
-    i2c_bus = open_ftdi_b()
-  except:
-    raise
-  try:
-    print '    PPC Temp: %d degreesC' %read_temp('PPC', i2c_bus)
-    print '    FPGA Temp: %d degreesC' %read_temp('FPGA', i2c_bus)
-    print '    Inlet Temp: %0.2f degreesC' %read_temp('INLET', i2c_bus)
-    print '    Inlet Temp: %0.2f degreesC' %read_temp('OUTLET', i2c_bus)
-    print ''
-  finally:
-    i2c_bus.Close()
+  if check_ppc_i2c():
+    try:
+      i2c_bus = open_ftdi_b()
+    except:
+      raise
+    try:
+      print '    PPC Temp: %d degreesC' %read_temp('PPC', i2c_bus)
+      print '    FPGA Temp: %d degreesC' %read_temp('FPGA', i2c_bus)
+      print '    Inlet Temp: %0.2f degreesC' %read_temp('INLET', i2c_bus)
+      print '    Inlet Temp: %0.2f degreesC' %read_temp('OUTLET', i2c_bus)
+      print ''
+    finally:
+      i2c_bus.Close()
+  else:
+    raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), temperatures not read.')
 
 #To select menu item without pressing enter, a timeout is added so that the menu loop is not blocked.
 def isdata():
