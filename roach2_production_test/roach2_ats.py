@@ -431,8 +431,7 @@ def test_power():
       print 'FATAL: Unconfigured current tolerance error detected, forcing board off'
       res = ftdi.ftdi_write_data(f, '\x30', 1)
       if res <> 1:
-        raise Exception('FATAL: Unconfigured currents out of range: %s, AND FTDI write ERROR, code: %d, WARNING: Board did not switch off, switch off manually!' %(c_err, res))
-      raise Exception, ('FATAL: Unconfigured currents out of range: %s' %c_err)
+        raise Exception('FTDI write ERROR, code: %d' %res)
     print 'done.'
     print '    Checking temperatures...',
     t_err = check_temps()
@@ -464,8 +463,6 @@ def test_power():
     time.sleep(0.5)
     curr_state = read_vmon_gpio('ATX_PG')
     print '    Current board state is %s.' %state[curr_state]
-    print '    Simulating power button press...',
-    res = ftdi.ftdi_write_data(f, '\x40', 1)
     if res <> 1:
       raise Exception('FTDI write ERROR, code: %d' %res)
     # poll ATX_PG until board state changes
@@ -882,7 +879,7 @@ if __name__ == "__main__":
         power_test = True
         print_menu = True
       elif '3' in answer:
-        print ''Last login: Thu Jul 19 01:00:04 2012 from 196.24
+        print ''
         pb_on = False
         press_pb('on')
         pb_on = True
@@ -991,17 +988,17 @@ if __name__ == "__main__":
         except:
           raise
         try:
-          uboot_load = False
+          uoot_load = False
           press_pb('off')
           press_pb('on')
           xio = xtx.Xmodem_tx(ser, defs.UBOOT_PATH, fh)
-          print '    Loading rinit (PPC Xmodem receiver initilisation program) via JTAG, this will take while...'
+          print '    Loading rinit (PPC Xmodem receiver program) via JTAG, this will take while...'
           load_ppc('support_files/program.mac')
-          #load_urj('support_files/clear_reset.urj')
-          #ser.flushInput()
-          #ser.flushOutput()i
+          start_time = time.time()
           print '    Sending U-Boot via Xmodem.'
-          xio.xmdm_send()
+          if not xio.xmdm_send():
+            print 'Elapsed: %f' %(time.time() - start_time)
+            raise Exception('FATAL: U-Boot Xmodem transfer not successfull.')
           if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY):
             raise  Exception('FATAL: U-Boot did not boot after x-modem transfer.')
           ser.write('\n')
@@ -1130,9 +1127,11 @@ if __name__ == "__main__":
       elif 'q' in answer:
         quit =  True
     except RuntimeError as e: 
-      print e
+      print c.FAIL + e + c.ENDC
       print_menu = True
     except:
-      print "ERROR:", sys.exc_info()[0], "Message: ", sys.exc_info()[1]
+      exc_type = sys.exc_info()[0]
+      exc_mess = sys.exc_info()[1]
       print ''
+      print c.FAIL+ ("ERROR: %s Message: %s" %(exc_type, exc_mess)) + c.ENDC
       print_menu = True

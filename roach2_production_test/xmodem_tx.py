@@ -42,7 +42,7 @@ class Xmodem_tx:
     stream = open(self.txf, 'rb')
     xmodem.log.addHandler(self.lh)
     xmdm = xmodem.XMODEM(self.getc, self.putc)
-    result = xmdm.send(stream, retry=1023)
+    result = xmdm.send(stream, retry=30, quiet = 1)
     stream.close()
     return result
 
