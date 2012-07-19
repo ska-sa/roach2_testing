@@ -336,7 +336,7 @@ def program_eeprom(sn):
     except:
       raise
     try:
-      print '    Writing boot parameters for configuration G boot to EEPROM locations 0x00 to 0x0f...',
+      print '    Writing boot params for config G boot to EEPROM locations 0x00 to 0x0f...',
       for i, v in enumerate(defs.CONFIG_G_BOOT):
         iicf.i2c_regwrite(i2c_bus, iicf.ADDR_BOOT_EEPROM_0, i, v)
         time.sleep(0.005)
@@ -728,12 +728,14 @@ if __name__ == "__main__":
   flash_chk = False
   uboot_load = False
   cpld_done = False
+  test_usb = False
+  uboot_rem = False
   quit = False
 
   # print_menu and menu_refresh is used to only reprint the menu when something changes.
   print_menu = True
   menu_refresh = False
-  menu_text = 'Main Menu'
+  menu_text = 'Main Menu - ' + c.WARNING + 'USB not connected' + c.ENDC
   # Set default print colours
   col = DEF_C.copy()
 
@@ -762,7 +764,7 @@ if __name__ == "__main__":
     try:
       # Reset colours and flags on USB disconnect
       if usb_disc:
-        menu_text = 'Main Menu - ' + c.WARNING + 'USB connected' + c.ENDC
+        menu_text = 'Main Menu - ' + c.WARNING + 'USB not connected' + c.ENDC
         col = DEF_C.copy()
         sn_set = False
         power_teset = False
@@ -777,6 +779,8 @@ if __name__ == "__main__":
         cpld_done = False
         print_menu = True
         menu_refresh = False
+        test_usb = False
+        uboot_rem = False
         os.system('clear')
 
       # Set menu colours
@@ -784,6 +788,7 @@ if __name__ == "__main__":
         print_menu = True
         menu_refresh = True
         menu_text = 'Main Menu - ' + c.OKGREEN + 'USB connected' + c.ENDC
+        os.system('clear')
       if sn_set:
         col['1'] = c.OKGREEN
       if power_test:
@@ -804,8 +809,13 @@ if __name__ == "__main__":
         col['9'] = c.OKGREEN
       if uboot_load:
         col['0'] = c.OKGREEN
+      elif uboot_rem:
+        col['0'] = c.ENDC
+        col['m'] = c.ENDC
       if cpld_done:
         col['w'] = c.OKGREEN
+      if test_usb:
+        col['r'] = c.OKGREEN
       
       if print_menu:
         manuf_id = sn['manufacturer']
@@ -872,7 +882,7 @@ if __name__ == "__main__":
         power_test = True
         print_menu = True
       elif '3' in answer:
-        print ''
+        print ''Last login: Thu Jul 19 01:00:04 2012 from 196.24
         pb_on = False
         press_pb('on')
         pb_on = True
@@ -892,13 +902,26 @@ if __name__ == "__main__":
         print_vc = True
         print_menu = True
       elif '6' in answer:
+        print c.OKBLUE + ('\n    Scanning JTAG chain.') + c.ENDC
         scan_jtag = False
-        print ''
         scan_jtag_chain()
         print_menu = True
         scan_jtag = True
       elif '7' in answer:
+        print c.OKBLUE + ('\n    Programming EEPROM.') + c.ENDC
         prog_eeprom = False
+        if not sn_set:
+          print '    WARNING: Serial number not set, press \'1\' to set or any key to use default...'
+          answer = getkey_block()
+          if '1' in answer:
+            done = False
+            while not done:
+              sn = set_serial_number()
+              print '    Is this correct? Press any key or \'n\' to re-enter serial number.'
+              answer = getkey_block()
+              if 'n' not in answer:
+                sn_set = True
+                done = True
         program_eeprom(sn)
         prog_eeprom = True
         print_menu = True
@@ -1001,10 +1024,10 @@ if __name__ == "__main__":
         except:
           raise
         try:
+          print c.OKBLUE + '\n    Programming CPLD.' + c.ENDC
           cpld_done = False
           ser.flushInput()
           ser.flushOutput()
-          print c.OKBLUE + '\n    Programming CPLD.' + c.ENDC
           press_pb('on')
           print '    Erasing CPLD...',
           load_urj('support_files/erase_cpld.urj')
@@ -1028,11 +1051,12 @@ if __name__ == "__main__":
       elif 'e' in answer:
         try:
           ser = open_ftdi_uart(ser_port, baud)
+        except:
+          raise
+        try:
+          print c.OKBLUE + '\n    Running preliminary DDR3, ZDOK, TGE and 1GE tests.' + c.ENDC
           press_pb('off')
           press_pb('on')
-          find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)
-          ser.write('\n')
-          time.sleep(0.5)
           ser.write('dhcp\n')
           find_str_ser(ser, 'Bytes transferred', 10)
           time.sleep(0.5)
@@ -1052,22 +1076,19 @@ if __name__ == "__main__":
           for i in range(2):
             ser.write('r2bit zdok %d\n' %i)
             print_outp_ser(ser, 2)
-          print ''
-          print ''
         finally:
           ser.close()
           print_menu = True
       elif 'r' in answer:
         try:
           ser = open_ftdi_uart(ser_port, baud)
-          print '    Loading roach2_bsp.bin from USB flash drive and programming FPGA.'
-          print ''
-          print ''
+        except:
+          raise
+        try:
+          print c.OKBLUE + '\n    Loading roach2_bsp.bin from USB flash drive and programming FPGA.' + c.ENDC
+          test_usb = False
           press_pb('off')
           press_pb('on')
-          find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)
-          ser.write('\n')
-          time.sleep(1)
           # Scan the USB bus 5 times, u-boot sometimes takes a while to detect the USB drive
           found = False
           retry = 0
@@ -1090,20 +1111,21 @@ if __name__ == "__main__":
           if out.find('$#NOT_FOUND$#') <> -1:
             raise Exception ('FATAL: USB transfer failed.')
           print ''
-          print ''
           print 'USB host working correctly.'
-          print ''
-          print ''
+          test_usb = True
         finally:
           ser.close()
           print_menu = True
       elif 'm' in answer:
+        print c.OKBLUE + ('\n    Removing U-Boot.') + c.ENDC
+        uboot_rem = False
         press_pb('off')
         press_pb('on')
-        print '    Unloading U-Boot via JTAG, this will take while...'
+        print '\n    Unloading U-Boot via JTAG, this will take while...'
         load_ppc('support_files/program.mac')
         print '    Done.'
-        print ''
+        uboot_rem = True
+        uboot_load = False
         print_menu = True
       elif 'q' in answer:
         quit =  True
