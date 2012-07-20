@@ -391,6 +391,20 @@ def open_ftdi_b():
       print '\nERROR: Could not connect to I2C bus, check USB connection.'
     raise
 
+# This method tries to write to the ftdi chip the specified amount, it seems that on some boards more than one write
+# is required. Data is one byte: '\xx', returns 1 if successfull, otherwise error code.
+def ftdi_write(interface, data, retries = 3):
+  retry = 0
+  while retry < retries:
+    res = ftdi.ftdi_write_data(interface, data, 1)
+    if res == 1:
+      retry = retries
+    else:
+      print c.WARNING + 'WARNING: FTDI write failed, retrying.' + c.ENDC
+      retry += 1
+      time.sleep(0.5)
+  return res
+
 def test_power():
   try:
     f = open_ftdi_d()
@@ -403,9 +417,8 @@ def test_power():
     if res <> 0:
       raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
     # force power on: PCTRL_EN = 1, PCTRL_ONn = 0, 
-    res = ftdi.ftdi_write_data(f, '\x20', 1)
-    if res <> 1:
-      raise Exception('FTDI write ERROR, code: %d' %res)
+    if ftdi_write(f, '\x20') <> 1:
+      raise Exception('ERROR: FTDI write error, code: %d' %res)
     print '        Board forced on...', 
     time.sleep(defs.PG_DELAY)
     # check ATX_PG
@@ -416,8 +429,7 @@ def test_power():
     v_err = check_voltages()
     if v_err:
       print 'FATAL: Voltage error detected, forcing board off'
-      res = ftdi.ftdi_write_data(f, '\x30', 1)
-      if res <> 1:
+      if ftdi_write(f, '\x30') <> 1:
         raise Exception('FATAL: Voltages out of range: %s, AND FTDI write ERROR, code: %d, WARNING: Board did not switch off, switch off manually!' %(v_err, res))
       raise Exception, ('FATAL: Voltages out of range: %s' %v_err)
     print 'done.'
@@ -429,33 +441,29 @@ def test_power():
     c_err = check_currents(defs.UC_C_THRESHOLD)
     if c_err:
       print 'FATAL: Unconfigured current tolerance error detected, forcing board off'
-      res = ftdi.ftdi_write_data(f, '\x30', 1)
-      if res <> 1:
-        raise Exception('FTDI write ERROR, code: %d' %res)
+      if ftdi_write(f, '\x30') <> 1:
+        raise Exception('ERROR: FTDI write error, code: %d' %res)
     print 'done.'
     print '    Checking temperatures...',
     t_err = check_temps()
     if t_err:
       print 'FATAL: Temperature sensor\s out of range, forcing board off'
-      res = ftdi.ftdi_write_data(f, '\x30', 1)
-      if res <> 1:
+      if ftdi_write(f, '\x30') <> 1:
         raise Exception('FATAL: Temperature sensor\s out of range: %s, AND FTDI write ERROR, code: %d, WARNING: Board did not switch off, switch off manually!' %(t_err, res))
       raise Exception, ('FATAL: Temperature sensor\s out of range: %s' %t_err)
     print 'done.'
     print_v_c()
     print_temps()
     print '    Forcing board off...',
-    res = ftdi.ftdi_write_data(f, '\x30', 1)
-    if res <> 1:
-      raise Exception('FTDI write ERROR, code: %d' %res)
+    if ftdi_write(f, '\x30') <> 1:
+      raise Exception('ERROR: FTDI write error, code: %d' %res)
     on = True
     while on:
       on = read_vmon_gpio('ATX_PG')
     print 'done.'
     print '    Disabling power force...',
-    res = ftdi.ftdi_write_data(f, '\x00', 1)
-    if res <> 1:
-      raise Exception('FTDI write ERROR, code: %d' %res)
+    if ftdi_write(f, '\x00') <> 1:
+      raise Exception('ERROR: FTDI write error, code: %d' %res)
     res = ftdi.ftdi_set_bitmode(f, 0x40, ftdi.BITMODE_BITBANG)
     if res <> 0:
       raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
@@ -463,37 +471,10 @@ def test_power():
     time.sleep(0.5)
     curr_state = read_vmon_gpio('ATX_PG')
     print '    Current board state is %s.' %state[curr_state]
-    if res <> 1:
-      raise Exception('FTDI write ERROR, code: %d' %res)
-    # poll ATX_PG until board state changes
-    new_state = curr_state
-    tout = 0
-    while (new_state == curr_state) and (tout < 10):
-      new_state = read_vmon_gpio('ATX_PG')
-      time.sleep(0.5)
-      tout = tout + 1
-    res = ftdi.ftdi_write_data(f, '\x00', 1)
-    if res <> 1:
-      raise Exception('FTDI write ERainOR, code: %d' %res)
-    if new_state == curr_state:
-      raise Exception, ('FATAL: Power button did not cycle board.')
-    print 'done.'
-    print '    Current board state is %s.' %state[new_state]
-    if not new_state:
-      print '    Switching board on...',
-      time.sleep(defs.PB_DELAY)
-      res = ftdi.ftdi_write_data(f, '\x40', 1)
-      if res <> 1:
-        raise Exception('FTDI write ERROR, code: %d' %res)
-      time.sleep(defs.PB_DELAY)
-      res = ftdi.ftdi_write_data(f, '\x00', 1)
-      if res <> 1:
-        raise Exception('FTDI write ERROR, code: %d' %res)
-      time.sleep(defs.PG_DELAY)
-      new_state = read_vmon_gpio('ATX_PG')
-      if not new_state:
-        raise Exception, ('FATAL: Power button did not cycle board.')
-      print 'done.'
+    print '    Simulating power button press...'
+    press_pb('on')
+    press_pb('off')
+    press_pb('on')
   finally:
     ftdi.ftdi_usb_close(f)
 
@@ -594,13 +575,13 @@ def check_ppc_i2c():
         raise Exception('ERROR: U-Boot did not load correctly during checking that the PPC released the I2C bus.')
     # Check if there is activity on the serial port, if so Linux is booting.
     elif (len(serial_obj.read(20)) > 0):
+      print '    Waiting for Linux to boot, this will take about a minute.' 
       tout = 0
       while (not i2c_avbl) and (tout < defs.BOOT_DELAY*10):
         serial_obj.write('\n')
         if find_str_ser(serial_obj, '=>', 1, False):
           i2c_avbl = True
         else:
-          print '    Waiting for Linux to boot, this will take some time.' 
           serial_obj.write('\n')
           if find_str_ser(serial_obj, 'login:', 1, False):
             i2c_avbl = True
@@ -630,21 +611,18 @@ def press_pb(request):
       res = ftdi.ftdi_set_bitmode(f, 0x40, ftdi.BITMODE_BITBANG)
       if res <> 0:
         raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
-      res = ftdi.ftdi_write_data(f, '\x40', 1)
-      if res <> 1:
-        raise Exception('FTDI write ERROR, code: %d' %res)
+      if ftdi_write(f, '\x40') <> 1:
+        raise Exception('ERROR: FTDI write error, code: %d' %res)
       # poll ATX_PG until board state changes
       new_state = curr_state
       tout = 0
-      while (new_state == curr_state) and (tout < 10):
+      while (new_state == curr_state) and (tout < 7):
         new_state = read_vmon_gpio('ATX_PG')
         time.sleep(0.5)
         tout = tout + 1
-      res = ftdi.ftdi_write_data(f, '\x00', 1)
-      if res <> 1:
-        raise Exception('FTDI write ERROR, code: %d' %res)
-      time.sleep(0.5)
-      if tout == 10:
+      if ftdi_write(f, '\x00') <> 1:
+        raise Exception('ERROR: FTDI write error, code: %d' %res)
+      if tout >= 7:
         raise Exception, ('Power button did not have an effect.')
   finally:
     ftdi.ftdi_usb_close(f)
@@ -724,6 +702,8 @@ if __name__ == "__main__":
   read_eeprom = False
   flash_chk = False
   uboot_load = False
+  kernel_load = False
+  root_load = False
   cpld_done = False
   test_usb = False
   uboot_rem = False
@@ -773,6 +753,8 @@ if __name__ == "__main__":
         read_eeprom = False
         flash_shk = False
         uboot_load = False
+        kernel_load = False
+        root_load = False
         cpld_done = False
         print_menu = True
         menu_refresh = False
@@ -835,7 +817,7 @@ if __name__ == "__main__":
         print col['7'] + '    7) Program EEPROM' + c.ENDC
         print col['8'] + '    8) Display EEPROM contents' + c.ENDC
         print col['9'] + '    9) Test FLASH memory' + c.ENDC
-        print col['0'] + '    0) Load U-boot' + c.ENDC
+        print col['0'] + '    0) Load U-boot, kernel and filesystem' + c.ENDC
         print col['w'] + '    w) Program CPLD' + c.ENDC
         print col['e'] + '    e) Run preliminary DDR3, ZDOK, TGE, 1GE tests' + c.ENDC
         print col['r'] + '    r) Test PPC USB host' + c.ENDC
@@ -982,36 +964,76 @@ if __name__ == "__main__":
           ser.close()
           print_menu = True
       elif '0' in answer:
-        print c.OKBLUE + ('\n    Loading U-Boot.') + c.ENDC
+        print c.OKBLUE + ('\n    Loading U-Boot, Linux kernel and on board Linux file system.')
+        print '        Press any key to load all three.'
+        print '        Press 1 to load U-Boot.'
+        print '        Press 2 to load the kernel.'
+        print '        Press 3 to load the file system.' + c.ENDC
+        answer = getkey_block()
+        load_all = False
+        load_uboot = False
+        load_kernel = False
+        load_root = False
+        if '1' in answer:
+          load_uboot = True
+        elif '2' in answer:
+          load_kernel = True
+        elif '3' in answer:
+          load_root = True
+        else:
+          load_all = True
+
         try:
           ser = open_ftdi_uart(ser_port, baud)
         except:
           raise
         try:
-          uoot_load = False
-          press_pb('off')
-          press_pb('on')
-          xio = xtx.Xmodem_tx(ser, defs.UBOOT_PATH, fh)
-          print '    Loading rinit (PPC Xmodem receiver program) via JTAG, this will take while...'
-          load_ppc('support_files/program.mac')
-          start_time = time.time()
-          print '    Sending U-Boot via Xmodem.'
-          if not xio.xmdm_send():
-            print 'Elapsed: %f' %(time.time() - start_time)
-            raise Exception('FATAL: U-Boot Xmodem transfer not successfull.')
-          if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY):
-            raise  Exception('FATAL: U-Boot did not boot after x-modem transfer.')
-          ser.write('\n')
-          ser.write('run clearenv\n')
-          print_outp_ser(ser, 1)
-          ser.write('reset\n')
-          if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY):
-            raise  Exception('FATAL: U-Boot did not boot after reset.')
-          ser.write('\n')
-          ser.write('saveenv\n')
-          print_outp_ser(ser, 1)
-          print ''
-          uboot_load = True
+          if load_all or load_uboot:
+            uoot_load = False
+            press_pb('off')
+            press_pb('on')
+            xio = xtx.Xmodem_tx(ser, defs.UBOOT_PATH, fh)
+            print '    Loading rinit (PPC Xmodem receiver program) via JTAG, this will take while...'
+            load_ppc('support_files/program.mac')
+            start_time = time.time()
+            print '    Sending U-Boot via Xmodem.'
+            if not xio.xmdm_send():
+              print 'Elapsed: %f' %(time.time() - start_time)
+              raise Exception('FATAL: U-Boot Xmodem transfer not successfull.')
+            if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY):
+              raise  Exception('FATAL: U-Boot did not boot after x-modem transfer.')
+            ser.write('\n')
+            ser.write('run clearenv\n')
+            print_outp_ser(ser, 1)
+            ser.write('reset\n')
+            if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY):
+              raise Exception('FATAL: U-Boot did not boot after reset.')
+            ser.write('\n')
+            ser.write('saveenv\n')
+            print_outp_ser(ser, 1)
+            uboot_load = True
+          if load_all or load_kernel:
+            kernel_load = False
+            if load_kernel:
+              press_pb('off')
+              press_pb('on')
+            ser.write('run tftpkernel\n')
+            if not find_str_ser(ser, 'DHCP client bound to address', 60):
+              raise Exception('ERROR: IP address not assigned, check connections and DHCP server.')
+            if not find_str_ser(ser, 'done\r\n=>', 40):
+              raise Exception('ERROR: Kernel did not load.')
+            kernel_load = True
+          if load_all or load_root:
+            if load_root:
+              press_pb('off')
+              press_pb('on')
+            root_load = False
+            ser.write('run tftproot\n')
+            if not find_str_ser(ser, 'DHCP client bound to address', 60):
+              raise Exception('ERROR: IP address not assigned, check connections and DHCP server.')
+            if not find_str_ser(ser, 'done\r\n=>', 5.5*60):
+              raise Exception('ERROR: Kernel did not load.')
+            root_load = True
         finally:
           ser.close()
           print_menu = True
