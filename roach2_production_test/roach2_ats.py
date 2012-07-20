@@ -964,11 +964,11 @@ if __name__ == "__main__":
           ser.close()
           print_menu = True
       elif '0' in answer:
-        print c.OKBLUE + ('\n    Loading U-Boot, Linux kernel and on board Linux file system.')
+        print c.OKBLUE + ('\n    Loading U-Boot, Linux kernel and on board root file system.')
         print '        Press any key to load all three.'
         print '        Press 1 to load U-Boot.'
         print '        Press 2 to load the kernel.'
-        print '        Press 3 to load the file system.' + c.ENDC
+        print '        Press 3 to load the root file system.' + c.ENDC
         answer = getkey_block()
         load_all = False
         load_uboot = False
@@ -1018,6 +1018,8 @@ if __name__ == "__main__":
               press_pb('off')
               press_pb('on')
             ser.write('run tftpkernel\n')
+            if not find_str_ser(ser, 'Waiting for PHY', 1):
+              raise Exception('ERROR: U-Boot not loaded, load U-Boot before loading kernel.')
             if not find_str_ser(ser, 'DHCP client bound to address', 60):
               raise Exception('ERROR: IP address not assigned, check connections and DHCP server.')
             if not find_str_ser(ser, 'done\r\n=>', 40):
@@ -1029,10 +1031,12 @@ if __name__ == "__main__":
               press_pb('on')
             root_load = False
             ser.write('run tftproot\n')
+            if not find_str_ser(ser, 'Waiting for PHY', 1):
+              raise Exception('ERROR: U-Boot not loaded, load U-Boot before loading root file system.')
             if not find_str_ser(ser, 'DHCP client bound to address', 60):
               raise Exception('ERROR: IP address not assigned, check connections and DHCP server.')
             if not find_str_ser(ser, 'done\r\n=>', 5.5*60):
-              raise Exception('ERROR: Kernel did not load.')
+              raise Exception('ERROR: Root file system did not load.')
             root_load = True
         finally:
           ser.close()
