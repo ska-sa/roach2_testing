@@ -391,6 +391,20 @@ def open_ftdi_b():
       print '\nERROR: Could not connect to I2C bus, check USB connection.'
     raise
 
+# This method tries to write to the ftdi chip the specified amount, it seems that on some boards more than one write
+# is required. Data is one byte: '\xx', returns 1 if successfull, otherwise error code.
+def ftdi_write(interface, data, retries = 3):
+  retry = 0
+  while retry < retries:
+    res = ftdi.ftdi_write_data(interface, data, 1)
+    if res == 1:
+      retry = retries
+    else:
+      print c.WARNING + 'WARNING: FTDI write failed, retrying.' + c.ENDC
+      retry += 1
+      time.sleep(0.5)
+  return res
+
 def test_power():
   try:
     f = open_ftdi_d()
@@ -403,9 +417,8 @@ def test_power():
     if res <> 0:
       raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
     # force power on: PCTRL_EN = 1, PCTRL_ONn = 0, 
-    res = ftdi.ftdi_write_data(f, '\x20', 1)
-    if res <> 1:
-      raise Exception('FTDI write ERROR, code: %d' %res)
+    if ftdi_write(f, '\x20') <> 1:
+      raise Exception('ERROR: FTDI write error, code: %d' %res)
     print '        Board forced on...', 
     time.sleep(defs.PG_DELAY)
     # check ATX_PG
@@ -416,8 +429,7 @@ def test_power():
     v_err = check_voltages()
     if v_err:
       print 'FATAL: Voltage error detected, forcing board off'
-      res = ftdi.ftdi_write_data(f, '\x30', 1)
-      if res <> 1:
+      if ftdi_write(f, '\x30') <> 1:
         raise Exception('FATAL: Voltages out of range: %s, AND FTDI write ERROR, code: %d, WARNING: Board did not switch off, switch off manually!' %(v_err, res))
       raise Exception, ('FATAL: Voltages out of range: %s' %v_err)
     print 'done.'
@@ -429,33 +441,29 @@ def test_power():
     c_err = check_currents(defs.UC_C_THRESHOLD)
     if c_err:
       print 'FATAL: Unconfigured current tolerance error detected, forcing board off'
-      res = ftdi.ftdi_write_data(f, '\x30', 1)
-      if res <> 1:
-        raise Exception('FTDI write ERROR, code: %d' %res)
+      if ftdi_write(f, '\x30') <> 1:
+        raise Exception('ERROR: FTDI write error, code: %d' %res)
     print 'done.'
     print '    Checking temperatures...',
     t_err = check_temps()
     if t_err:
       print 'FATAL: Temperature sensor\s out of range, forcing board off'
-      res = ftdi.ftdi_write_data(f, '\x30', 1)
-      if res <> 1:
+      if ftdi_write(f, '\x30') <> 1:
         raise Exception('FATAL: Temperature sensor\s out of range: %s, AND FTDI write ERROR, code: %d, WARNING: Board did not switch off, switch off manually!' %(t_err, res))
       raise Exception, ('FATAL: Temperature sensor\s out of range: %s' %t_err)
     print 'done.'
     print_v_c()
     print_temps()
     print '    Forcing board off...',
-    res = ftdi.ftdi_write_data(f, '\x30', 1)
-    if res <> 1:
-      raise Exception('FTDI write ERROR, code: %d' %res)
+    if ftdi_write(f, '\x30') <> 1:
+      raise Exception('ERROR: FTDI write error, code: %d' %res)
     on = True
     while on:
       on = read_vmon_gpio('ATX_PG')
     print 'done.'
     print '    Disabling power force...',
-    res = ftdi.ftdi_write_data(f, '\x00', 1)
-    if res <> 1:
-      raise Exception('FTDI write ERROR, code: %d' %res)
+    if ftdi_write(f, '\x00') <> 1:
+      raise Exception('ERROR: FTDI write error, code: %d' %res)
     res = ftdi.ftdi_set_bitmode(f, 0x40, ftdi.BITMODE_BITBANG)
     if res <> 0:
       raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
@@ -463,37 +471,10 @@ def test_power():
     time.sleep(0.5)
     curr_state = read_vmon_gpio('ATX_PG')
     print '    Current board state is %s.' %state[curr_state]
-    if res <> 1:
-      raise Exception('FTDI write ERROR, code: %d' %res)
-    # poll ATX_PG until board state changes
-    new_state = curr_state
-    tout = 0
-    while (new_state == curr_state) and (tout < 10):
-      new_state = read_vmon_gpio('ATX_PG')
-      time.sleep(0.5)
-      tout = tout + 1
-    res = ftdi.ftdi_write_data(f, '\x00', 1)
-    if res <> 1:
-      raise Exception('FTDI write ERainOR, code: %d' %res)
-    if new_state == curr_state:
-      raise Exception, ('FATAL: Power button did not cycle board.')
-    print 'done.'
-    print '    Current board state is %s.' %state[new_state]
-    if not new_state:
-      print '    Switching board on...',
-      time.sleep(defs.PB_DELAY)
-      res = ftdi.ftdi_write_data(f, '\x40', 1)
-      if res <> 1:
-        raise Exception('FTDI write ERROR, code: %d' %res)
-      time.sleep(defs.PB_DELAY)
-      res = ftdi.ftdi_write_data(f, '\x00', 1)
-      if res <> 1:
-        raise Exception('FTDI write ERROR, code: %d' %res)
-      time.sleep(defs.PG_DELAY)
-      new_state = read_vmon_gpio('ATX_PG')
-      if not new_state:
-        raise Exception, ('FATAL: Power button did not cycle board.')
-      print 'done.'
+    print '    Simulating power button press...'
+    press_pb('on')
+    press_pb('off')
+    press_pb('on')
   finally:
     ftdi.ftdi_usb_close(f)
 
@@ -594,13 +575,13 @@ def check_ppc_i2c():
         raise Exception('ERROR: U-Boot did not load correctly during checking that the PPC released the I2C bus.')
     # Check if there is activity on the serial port, if so Linux is booting.
     elif (len(serial_obj.read(20)) > 0):
+      print '    Waiting for Linux to boot, this will take about a minute.' 
       tout = 0
       while (not i2c_avbl) and (tout < defs.BOOT_DELAY*10):
         serial_obj.write('\n')
         if find_str_ser(serial_obj, '=>', 1, False):
           i2c_avbl = True
         else:
-          print '    Waiting for Linux to boot, this will take some time.' 
           serial_obj.write('\n')
           if find_str_ser(serial_obj, 'login:', 1, False):
             i2c_avbl = True
@@ -630,21 +611,18 @@ def press_pb(request):
       res = ftdi.ftdi_set_bitmode(f, 0x40, ftdi.BITMODE_BITBANG)
       if res <> 0:
         raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
-      res = ftdi.ftdi_write_data(f, '\x40', 1)
-      if res <> 1:
-        raise Exception('FTDI write ERROR, code: %d' %res)
+      if ftdi_write(f, '\x40') <> 1:
+        raise Exception('ERROR: FTDI write error, code: %d' %res)
       # poll ATX_PG until board state changes
       new_state = curr_state
       tout = 0
-      while (new_state == curr_state) and (tout < 10):
+      while (new_state == curr_state) and (tout < 7):
         new_state = read_vmon_gpio('ATX_PG')
         time.sleep(0.5)
         tout = tout + 1
-      res = ftdi.ftdi_write_data(f, '\x00', 1)
-      if res <> 1:
-        raise Exception('FTDI write ERROR, code: %d' %res)
-      time.sleep(0.5)
-      if tout == 10:
+      if ftdi_write(f, '\x00') <> 1:
+        raise Exception('ERROR: FTDI write error, code: %d' %res)
+      if tout >= 7:
         raise Exception, ('Power button did not have an effect.')
   finally:
     ftdi.ftdi_usb_close(f)
