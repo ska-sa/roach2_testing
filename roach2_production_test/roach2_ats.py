@@ -559,7 +559,8 @@ def print_outp_ser(serial_obj, timeout):
   return buff    
 
 # The I2C bus has 2 masters, FTDI and PPC. This method will check the state of the PPC and wait till it has released the I2C bus.
-# This method opens a serial port object, if the serial port is already open that object wont be affected. 
+# This method opens a serial port object, if the serial port is already open that object wont be affected.
+# Note that the delays are multiplied by 10 as the serial port timeout is set to 0.1s
 def check_ppc_i2c():
   try:
     serial_obj = open_ftdi_uart(ser_port, baud, 0.1)
@@ -579,11 +580,11 @@ def check_ppc_i2c():
       tout = 0
       while (not i2c_avbl) and (tout < defs.BOOT_DELAY*10):
         serial_obj.write('\n')
-        if find_str_ser(serial_obj, '=>', 1, False):
+        if find_str_ser(serial_obj, '=>', 1*10, False):
           i2c_avbl = True
         else:
           serial_obj.write('\n')
-          if find_str_ser(serial_obj, 'login:', 1, False):
+          if find_str_ser(serial_obj, 'login:', 1*10, False):
             i2c_avbl = True
         tout += 1
       if not i2c_avbl:
@@ -686,6 +687,7 @@ if __name__ == "__main__":
     'w':c.ENDC,
     'e':c.ENDC,
     'r':c.ENDC,
+    't':c.ENDC,
     'q':c.ENDC,
     'm':c.ENDC
   }
@@ -705,6 +707,7 @@ if __name__ == "__main__":
   kernel_load = False
   root_load = False
   cpld_done = False
+  qdr_ok = False
   test_usb = False
   uboot_rem = False
   quit = False
@@ -756,10 +759,11 @@ if __name__ == "__main__":
         kernel_load = False
         root_load = False
         cpld_done = False
-        print_menu = True
-        menu_refresh = False
+        qdr_ok = False
         test_usb = False
         uboot_rem = False
+        print_menu = True
+        menu_refresh = False
         os.system('clear')
 
       # Set menu colours
@@ -793,8 +797,10 @@ if __name__ == "__main__":
         col['m'] = c.ENDC
       if cpld_done:
         col['w'] = c.OKGREEN
+      if qdr_ok:
+        col['e'] = c.OKGREEN
       if test_usb:
-        col['r'] = c.OKGREEN
+        col['t'] = c.OKGREEN
       
       if print_menu:
         manuf_id = sn['manufacturer']
@@ -819,13 +825,14 @@ if __name__ == "__main__":
         print col['9'] + '    9) Test FLASH memory' + c.ENDC
         print col['0'] + '    0) Load U-boot, kernel and filesystem' + c.ENDC
         print col['w'] + '    w) Program CPLD' + c.ENDC
-        print col['e'] + '    e) Run preliminary DDR3, ZDOK, TGE, 1GE tests' + c.ENDC
-        print col['r'] + '    r) Test PPC USB host' + c.ENDC
+        print col['e'] + '    e) Test QDR memory' + c.ENDC
+        print col['r'] + '    r) Run preliminary DDR3, ZDOK, TGE, 1GE tests' + c.ENDC
+        print col['t'] + '    t) Test PPC USB host' + c.ENDC
         print col['m'] + '    m) Unload U-Boot (if U-Boot does not start correctly and holds the I2C bus).' + c.ENDC
         print col['q'] + '    q) Quit' + c.ENDC
       answer = getkey()
       if answer == None:
-        answer = 'do nothing'
+        answer = ''
         print_menu = False
       else:
         # Set menu colour to fail, will be set to pass if tests pass.
@@ -839,7 +846,7 @@ if __name__ == "__main__":
         sn = set_serial_number()
         sn_set = True
         print_menu = True
-      if '2' in answer:
+      elif '2' in answer:
         print c.OKBLUE + '\n    Testing power, configuring EEPROM and scanning JTAG chain' + c.ENDC
         power_test = False
         if not sn_set:
@@ -1077,6 +1084,33 @@ if __name__ == "__main__":
         except:
           raise
         try:
+          print c.OKBLUE + '\n    Testing QDR memory.' + c.ENDC
+          qdr_ok = False
+          ser.flushInput()
+          ser.flushOutput()
+          print '    Checking PPC state...',
+          ser.write('\n')
+          if find_str_ser(ser, 'login:', 1, False):
+            print 'Linux booted.'
+          else:
+            print 'Linux not booted, cycling power.'
+            press_pb('off')
+            press_pb('on')
+            print '    Waiting for Linux to boot...',
+            if find_str_ser(ser, 'login:', defs.BOOT_DELAY , False):
+              print 'Linux booted.'
+            else:
+              raise Exception('ERROR: Linux not loaded or did not boot correctly.')
+          qdr_ok = True
+        finally:
+          ser.close()
+          print_menu = True
+      elif 'r' in answer:
+        try:
+          ser = open_ftdi_uart(ser_port, baud)
+        except:
+          raise
+        try:
           print c.OKBLUE + '\n    Running preliminary DDR3, ZDOK, TGE and 1GE tests.' + c.ENDC
           press_pb('off')
           press_pb('on')
@@ -1102,7 +1136,7 @@ if __name__ == "__main__":
         finally:
           ser.close()
           print_menu = True
-      elif 'r' in answer:
+      elif 't' in answer:
         try:
           ser = open_ftdi_uart(ser_port, baud)
         except:
