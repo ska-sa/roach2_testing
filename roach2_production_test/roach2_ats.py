@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os, sys, time, select, termios, tty, ftdi, subprocess, serial, logging
+from optparse import OptionParser
 from mpsse import *
 import i2c_functions as iicf
 import xmodem_tx as xtx
@@ -662,11 +663,19 @@ def press_pb(request):
     ftdi.ftdi_usb_close(f)
 
 if __name__ == "__main__":
+  
+  p = OptionParser()
+  p.set_usage('roach2_ats.py revision')
+  # There are many differences between ROACH2 Rev 1 and 2. Select which version to test here.
+  if args == []:
+    REV = 2
+  elif args[0] == 1:
+    REV = 1
+  else:
+    REV = 2
 
   os.system('clear')
 
-  # There are many differences between ROACH2 Rev 1 and 2. Select which version to test here.
-  REV = 2 
   if REV == 1:
     sn = defs.SN_REV1
   else:

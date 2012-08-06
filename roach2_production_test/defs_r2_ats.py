@@ -35,7 +35,7 @@ V_MON_MAP = {
   '5V0'     : [6, u16],
   '12V'     : [7, u16],
   '3V3_AUX' : [8, u16],
-  '5V0_AUX'  : [7, u23]
+  '5V0_AUX' : [7, u23]
 }
  # Votage monitor GPIO mappings
 V_MON_GPIO = {
@@ -111,24 +111,24 @@ V_THRESHOLD_REV1 = {
   '3V3_AUX_L' : 12.0/DIV - (12.0/DIV)*TOL_V
 }
 V_THRESHOLD_REV2 = {
-  '12V_H'     : 12.0/DIV + (12.0/DIV)*TOL_V,
-  '12V_L'     : 12.0/DIV - (12.0/DIV)*TOL_V,
-  '5V0_H'     : 5.0 + 5.0*TOL_V,
-  '5V0_L'     : 5.0 - 5.0*TOL_V,
-  '3V3_H'     : 3.3 + 3.3*TOL_V,
-  '3V3_L'     : 3.3 - 3.3*TOL_V,
-  '2V5_H'     : 2.5 + 2.5*TOL_V,
-  '2V5_L'     : 2.5 - 2.5*TOL_V,
-  '1V8_H'     : 1.8 + 1.8*TOL_V,
-  '1V8_L'     : 1.8 - 1.8*TOL_V,
-  '1V5_H'     : 1.5 + 1.5*TOL_V,
-  '1V5_L'     : 1.5 - 1.5*TOL_V,
-  '1V0_H'     : 1.0 + 1.0*TOL_V,
-  '1V0_L'     : 1.0 - 1.0*TOL_V,
-  '3V3_AUX_H' : 3.4 + 3.4*TOL_V,
-  '3V3_AUX_L' : 3.4 - 3.4*TOL_V,
-  '5V0_AUX_H'  : 5.0 + 5.0*TOL_V,
-  '5V0_AUX_L'  : 5.0 - 5.0*TOL_V
+  '12V_H'     : 12.0 + 12.0*TOL_V,
+  '12V_L'     : 12.0 - 12.0*TOL_V,
+  '5V0_H'     : 5.0  + 5.0*TOL_V,
+  '5V0_L'     : 5.0  - 5.0*TOL_V,
+  '3V3_H'     : 3.3  + 3.3*TOL_V,
+  '3V3_L'     : 3.3  - 3.3*TOL_V,
+  '2V5_H'     : 2.5  + 2.5*TOL_V,
+  '2V5_L'     : 2.5  - 2.5*TOL_V,
+  '1V8_H'     : 1.8  + 1.8*TOL_V,
+  '1V8_L'     : 1.8  - 1.8*TOL_V,
+  '1V5_H'     : 1.5  + 1.5*TOL_V,
+  '1V5_L'     : 1.5  - 1.5*TOL_V,
+  '1V0_H'     : 1.0  + 1.0*TOL_V,
+  '1V0_L'     : 1.0  - 1.0*TOL_V,
+  '3V3_AUX_H' : 3.4  + 3.4*TOL_V,
+  '3V3_AUX_L' : 3.4  - 3.4*TOL_V,
+  '5V0_AUX_H' : 5.0  + 5.0*TOL_V,
+  '5V0_AUX_L' : 5.0  - 5.0*TOL_V
 }
 
 # Temperature tolerances
