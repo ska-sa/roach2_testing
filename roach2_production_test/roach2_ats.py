@@ -181,7 +181,7 @@ def print_v_c():
         print "    12V Bus: %.3fV, %.3fA" %((read_voltage('3V3_AUX', i2c_bus)*defs_max16071.V_DIV_12V), read_ob_current('12V', i2c_bus))
         print "    3V3 Aux: not avialable on revision 1"
       else:
-        print "    12V Bus: %.3fV, %.3fA" %((read_voltage('12V', i2c_bus)*defs_max16071.V_DIV_12V), read_ob_current('12V', i2c_bus))
+        print "    12V Bus: %.3fV, %.3fA" %(read_voltage('12V', i2c_bus), read_ob_current('12V', i2c_bus))
         print "    3V3 Aux: %.3fV" %read_voltage('3V3_AUX', i2c_bus)
         print "    5V0 Aux: %.3fV" %read_voltage('5V0_AUX', i2c_bus)
       print "    MGT 1.2V Power Good = %d" %read_vmon_gpio('MGT_1V2_PG')
@@ -666,14 +666,14 @@ if __name__ == "__main__":
   
   p = OptionParser()
   p.set_usage('roach2_ats.py revision')
+  opts, args = p.parse_args(sys.argv[1:])
   # There are many differences between ROACH2 Rev 1 and 2. Select which version to test here.
   if args == []:
     REV = 2
-  elif args[0] == 1:
+  elif args[0] == '1':
     REV = 1
   else:
     REV = 2
-
   os.system('clear')
 
   if REV == 1:
