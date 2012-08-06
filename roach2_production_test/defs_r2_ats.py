@@ -1,11 +1,18 @@
 #defs_r2_ats.py
-import defs_max16071
+import defs_max16071, i2c_functions
 
 # Serial number dictionary
-SN = { 
+SN_REV1 = { 
     'manufacturer' : 0x44, 
     'type'         : 0x01, 
     'revision'     : 0x01, 
+    'batch'        : 0x00, 
+    'board'        : 0x00 
+  } 
+SN_REV2 = { 
+    'manufacturer' : 0x44, 
+    'type'         : 0x01, 
+    'revision'     : 0x02, 
     'batch'        : 0x00, 
     'board'        : 0x00 
   } 
@@ -16,31 +23,34 @@ MANUF = {
   'Digicom' : 0x44
 }
 
-# Voltage monitor mappings to channel on max16071
+# Voltage monitor mappings to channel on max16071 (I2C addresses: 0x50, 0x51)
+u16 = i2c_functions.ADDR_V_MON
+u23 = i2c_functions.ADDR_C_MON
 V_MON_MAP = {
-  '1V0'     : 1,
-  '1V5'     : 2,
-  '1V8'     : 3,
-  '2V5'     : 4,
-  '3V3'     : 5,
-  '5V0'     : 6,
-  '12V'     : 7,
-  '3V3_AUX' : 8
+  '1V0'     : [1, u16],
+  '1V5'     : [2, u16],
+  '1V8'     : [3, u16],
+  '2V5'     : [4, u16],
+  '3V3'     : [5, u16],
+  '5V0'     : [6, u16],
+  '12V'     : [7, u16],
+  '3V3_AUX' : [8, u16],
+  '5V0_AUX'  : [7, u23]
 }
  # Votage monitor GPIO mappings
 V_MON_GPIO = {
   'MGT_1V2_PG' : 2,
   'MGT_1V0_PG' : 3,
-  'ATX_PG'     : 4
+  'ATX_PWR_OK' : 4
 }
 
 # Current monitor mappings to channel on max16071
 C_MON_MAP = {
-  '3V3'     : 1,
-  '2V5'     : 2,
-  '1V8'     : 3,
-  '1V5'     : 4,
-  '1V0'     : 5
+  '3V3'        : 1,
+  '2V5'        : 2,
+  '1V8'        : 3,
+  '1V5'        : 4,
+  '1V0'        : 5
 }
 
 # FTDI VID and PID
@@ -84,9 +94,7 @@ UC_C_THRESHOLD = {
 # Voltage thresholds, mods for rev1: 3V3_AUX is 12V and 12V = 0
 TOL_V = 0.04
 DIV = defs_max16071.V_DIV_12V
-V_THRESHOLD = {
-#  '12V_H'     : 12.0/DIV + (12.0/DIV)*TOL_V,
-#  '12V_L'     : 12.0/DIV - (12.0/DIV)*TOL_V,
+V_THRESHOLD_REV1 = {
   '5V0_H'     : 5.0 + 5.0*TOL_V,
   '5V0_L'     : 5.0 - 5.0*TOL_V,
   '3V3_H'     : 3.3 + 3.3*TOL_V,
@@ -100,9 +108,27 @@ V_THRESHOLD = {
   '1V0_H'     : 1.0 + 1.0*TOL_V,
   '1V0_L'     : 1.0 - 1.0*TOL_V,
   '3V3_AUX_H' : 12.0/DIV + (12.0/DIV)*TOL_V,
-  '3V3_AUX_L' : 12.0/DIV - (12.0/DIV)*TOL_V,
-#  '3V3_AUX_H' : 3.3 + 3.3*TOL_V,
-#  '3V3_AUX_L' : 3.3 - 3.3*TOL_V
+  '3V3_AUX_L' : 12.0/DIV - (12.0/DIV)*TOL_V
+}
+V_THRESHOLD_REV2 = {
+  '12V_H'     : 12.0/DIV + (12.0/DIV)*TOL_V,
+  '12V_L'     : 12.0/DIV - (12.0/DIV)*TOL_V,
+  '5V0_H'     : 5.0 + 5.0*TOL_V,
+  '5V0_L'     : 5.0 - 5.0*TOL_V,
+  '3V3_H'     : 3.3 + 3.3*TOL_V,
+  '3V3_L'     : 3.3 - 3.3*TOL_V,
+  '2V5_H'     : 2.5 + 2.5*TOL_V,
+  '2V5_L'     : 2.5 - 2.5*TOL_V,
+  '1V8_H'     : 1.8 + 1.8*TOL_V,
+  '1V8_L'     : 1.8 - 1.8*TOL_V,
+  '1V5_H'     : 1.5 + 1.5*TOL_V,
+  '1V5_L'     : 1.5 - 1.5*TOL_V,
+  '1V0_H'     : 1.0 + 1.0*TOL_V,
+  '1V0_L'     : 1.0 - 1.0*TOL_V,
+  '3V3_AUX_H' : 3.4 + 3.4*TOL_V,
+  '3V3_AUX_L' : 3.4 - 3.4*TOL_V,
+  '5V0_AUX_H'  : 5.0 + 5.0*TOL_V,
+  '5V0_AUX_L'  : 5.0 - 5.0*TOL_V
 }
 
 # Temperature tolerances
@@ -147,7 +173,7 @@ XILINX_SRC_PATH = '/opt/Xilinx/12.4/LabTools/settings64.sh'
 CPLD_MD = 'c0000000: 010f0000 03000000 010f0000 03000000    ................'
 
 #JTAG scan chain output sample
-JTAG_SCAN_RENESAS ='Connected to libftdi driver.\nIR length: 64\nChain length: 11\nDevice Id: 00011000000000000110000110010111 (0x18006197)\n  Filename:     support_files/bsdl/MAX16071.BSD\nDevice Id: 00011000000000000110000110010111 (0x18006197)\n  Filename:     support_files/bsdl/MAX16071.BSD\nDevice Id: 00000000000000000000001111010011 (0x000003D3)\n  Filename:     support_files/bsdl/marvell_guess.bsd\nDevice Id: 00000000000000000000001111010011 (0x000003D3)\n  Filename:     support_files/bsdl/marvell_guess.bsd\nDevice Id: 00001011011011111110010001000111 (0x0B6FE447)\n  Filename:     support_files/bsdl/R1QDA7236.bsd\nDevice Id: 00001011011011111110010001000111 (0x0B6FE447)\n  Filename:     support_files/bsdl/R1QDA7236.bsd\nDevice Id: 00001011011011111110010001000111 (0x0B6FE447)\n  Filename:     support_files/bsdl/R1QDA7236.bsd\nDevice Id: 00001011011011111110010001000111 (0x0B6FE447)\n  Filename:     support_files/bsdl/R1QDA7236.bsd\nDevice Id: 00010110110101001010000010010011 (0x16D4A093)\n  Filename:     support_files/bsdl/XC2C256_VQ100.bsdl\nDevice Id: 01100100001010001000000010010011 (0x64288093)\n  Filename:     support_files/bsdl/xc6vsx475t_ff1759.bsdl\nDevice Id: 00000100010000001111000111100001 (0x0440F1E1)\n  Filename:     support_files/bsdl/ct_wrap_440EPx_B_Full.bsd\n'
+JTAG_SCAN_RENESAS ='Connected to libftdi driver.\nIR length: 64\nChain length: 11\nDevice Id: 00011000000000000110000110010111 (0x18006197)\n  Filename:     support_files/bsdl/MAX16071.BSD\nDevice Id: 00011000000000000110000110010111 (0x18006197)\n  Filename:     support_files/bsdl/MAX16071.BSD\nDevice Id: 00000000000000000000001111010011 (0x000003D3)\n  Filename:     support_files/bsdl/marvell_guess.bsd\nDevice Id: 00000000000000000000001111010011 (0x000003D3)\n  Filename:     support_files/bsdl/marvell_guess.bsd\nDevice Id: 00001011011011111110010001000111 (0x0B6FE447)\n  Filename:     support_files/bsdl/R1QDA7236.bsd\nDevice Id: 00001011011011111110010001000111 (0x0B6FE447)\n  Filename:     support_files/bsdl/R1QDA7236.bsd\nDevice Id: 00001011011011111110010001000111 (0x0B6FE447)\n  Filename:     support_files/bsdl/R1QDA7236.bsd\nDevice Id: 00001011011011111110010001000111 (0x0B6FE447)\n  Filename:     support_files/bsdl/R1QDA7236.bsd\nDevice Id: 00010110110101001010000010010011 (0x16D4A093)\n  Filename:     support_files/bsdl/XC2C256_VQ100.bsdl\nDevice Id: 01100100001010001000000010010011 (0x64288093)\n  Filename:     support_files/bsdl/xc6vsx475t_ff1759.bsd\nDevice Id: 00000100010000001111000111100001 (0x0440F1E1)\n  Filename:     support_files/bsdl/ct_wrap_440EPx_B_Full.bsd\n'
 
 JTAG_SCAN_CYPRESS = 'Connected to libftdi driver.\nIR length: 64\nChain length: 11\nDevice Id: 00011000000000000110000110010111 (0x18006197)\n  Filename:     support_files/bsdl/MAX16071.BSD\nDevice Id: 00011000000000000110000110010111 (0x18006197)\n  Filename:     support_files/bsdl/MAX16071.BSD\nDevice Id: 00000000000000000000001111010011 (0x000003D3)\n  Filename:     support_files/bsdl/marvell_guess.bsd\nDevice Id: 00000000000000000000001111010011 (0x000003D3)\n  Filename:     support_files/bsdl/marvell_guess.bsd\nDevice Id: 00011010010001100100000001101001 (0x1A464069)\n  Filename:     support_files/bsdl/25652kv18_x36_165.bsd\nDevice Id: 00011010010001100100000001101001 (0x1A464069)\n  Filename:     support_files/bsdl/25652kv18_x36_165.bsd\nDevice Id: 00011010010001100100000001101001 (0x1A464069)\n  Filename:     support_files/bsdl/25652kv18_x36_165.bsd\nDevice Id: 00011010010001100100000001101001 (0x1A464069)\n  Filename:     support_files/bsdl/25652kv18_x36_165.bsd\nDevice Id: 00010110110101001010000010010011 (0x16D4A093)\n  Filename:     support_files/bsdl/XC2C256_VQ100.bsdl\nDevice Id: 01100100001010001000000010010011 (0x64288093)\n  Filename:     support_files/bsdl/xc6vsx475t_ff1759.bsd\nDevice Id: 00000100010000001111000111100001 (0x0440F1E1)\n  Filename:     support_files/bsdl/ct_wrap_440EPx_B_Full.bsd\n'
 

@@ -31,11 +31,11 @@ def config_mon():
     i2c_bus.Close()
 
 def read_voltage(vbus, i2c_bus):
-  ch = defs.V_MON_MAP[vbus]
+  ch = defs.V_MON_MAP[vbus][0]
+  addr = defs.V_MON_MAP[vbus][1]
   ch_idx = (ch - 1)*2
   msb = defs_max16071.CH_ARRAY[ch_idx]
   lsb = defs_max16071.CH_ARRAY[ch_idx+1]
-  addr = iicf.ADDR_V_MON
   voltage = ((iicf.i2c_regread(i2c_bus, addr , msb)) << 2) + ((iicf.i2c_regread(i2c_bus, addr, lsb)) >> 6)
   # get full scale voltage for requested channel
   if ch < 5:
@@ -66,16 +66,20 @@ def read_current(vbus, i2c_bus):
     adc_conf = iicf.i2c_regread(i2c_bus, addr, defs_max16071.ADC_CONF_8765)
     fs_v = defs_max16071.ADC_RNG[(adc_conf >> (ch_idx - 8)) & 0x03]
   res = defs_max16071.SNS_RES[ch - 1]
-  gain = 1 + (1e5/defs_max16071.GAIN_RES[ch - 1])
+  # Select gain resistor according to ROACH2 revision
+  if REV == 1:
+    gain = 1 + (1e5/defs_max16071.GAIN_RES_REV1[ch - 1])
+  else:
+    gain = 1 + (1e5/defs_max16071.GAIN_RES_REV2[ch - 1])
   amps = ((voltage/1024.0)*fs_v)/(res*gain)
   return amps
 
 # read max16071 onboard current
 def read_ob_current(vbus, i2c_bus):
-  if vbus == '5V':
+  if vbus == '5V0':
     addr = iicf.ADDR_C_MON
     res = defs_max16071.SNS_RES_5V0
-  else:
+  else: #12V current
     addr = iicf.ADDR_V_MON
     res = defs_max16071.SNS_RES_12V
   voltage = iicf.i2c_regread(i2c_bus, addr, defs_max16071.MON_C)
@@ -137,7 +141,12 @@ def check_voltages():
       raise
     try:
       v_err = []
-      for i, v in defs.V_THRESHOLD.iteritems():
+      # Select voltage profile according to ROACH2 Revision
+      if REV == 1:
+        dic = defs.V_THRESHOLD_REV1
+      else:
+        dic = defs.V_THRESHOLD_REV2
+      for i, v in dic.iteritems():
         volts = read_voltage(i[:-2], i2c_bus)
         if i[-1] == 'H':
           if volts > v:
@@ -160,22 +169,20 @@ def print_v_c():
     except:
       raise
     try:
-      print "    1V0 Monitor: %.3fv" %read_voltage('1V0', i2c_bus)
-      print "    1V5 Monitor: %.3fv" %read_voltage('1V5', i2c_bus)
-      print "    1V8 Monitor: %.3fv" %read_voltage('1V8', i2c_bus)
-      print "    2V5 Monitor: %.3fv" %read_voltage('2V5', i2c_bus)
-      print "    3V3 Monitor: %.3fv" %read_voltage('3V3', i2c_bus)
-      print "    5V0 Monitor: %.3fv" %read_voltage('5V0', i2c_bus)
-      print "    12V Monitor: %.3fv" %read_voltage('12V', i2c_bus)
-      print "    3V3 Aux Monitor: %.3fv" %read_voltage('3V3_AUX', i2c_bus)
-      print "    12V Monitor (rev1 mod): %.3fv" %(read_voltage('3V3_AUX', i2c_bus)*defs_max16071.V_DIV_12V)
-      print "    12V current: %.3fA" %read_ob_current('12V', i2c_bus)
-      print "    5V0 current: %.3fA" %read_ob_current('5V', i2c_bus)
-      print "    3V3 current: %.3fA" %read_current('3V3', i2c_bus)
-      print "    2V5 current: %.3fA" %read_current('2V5', i2c_bus)
-      print "    1V8 current: %.3fA" %read_current('1V8', i2c_bus)
-      print "    1V5 current: %.3fA" %read_current('1V5', i2c_bus)
-      print "    1V0 current: %.3fA" %read_current('1V0', i2c_bus)
+      print "    1V0 Bus: %.3fV, %.3fA" %(read_voltage('1V0', i2c_bus), read_current('1V0', i2c_bus))
+      print "    1V5 Bus: %.3fV, %.3fA" %(read_voltage('1V5', i2c_bus), read_current('1V5', i2c_bus))
+      print "    1V8 Bus: %.3fV, %.3fA" %(read_voltage('1V8', i2c_bus), read_current('1V8', i2c_bus))
+      print "    2V5 Bus: %.3fV, %.3fA" %(read_voltage('2V5', i2c_bus), read_current('2V5', i2c_bus))
+      print "    3V3 Bus: %.3fV, %.3fA" %(read_voltage('3V3', i2c_bus), read_current('3V3', i2c_bus))
+      print "    5V0 Bus: %.3fV, %.3fA" %(read_voltage('5V0', i2c_bus), read_ob_current('5V0', i2c_bus))
+      if REV == 1:
+        # MAX16071 mod puts 12v line on 3v3aux monitor
+        print "    12V Bus: %.3fV, %.3fA" %((read_voltage('3V3_AUX', i2c_bus)*defs_max16071.V_DIV_12V), read_ob_current('12V', i2c_bus))
+        print "    3V3 Aux: not avialable on revision 1"
+      else:
+        print "    12V Bus: %.3fV, %.3fA" %((read_voltage('12V', i2c_bus)*defs_max16071.V_DIV_12V), read_ob_current('12V', i2c_bus))
+        print "    3V3 Aux: %.3fV" %read_voltage('3V3_AUX', i2c_bus)
+        print "    5V0 Aux: %.3fV" %read_voltage('5V0_AUX', i2c_bus)
       print "    MGT 1.2V Power Good = %d" %read_vmon_gpio('MGT_1V2_PG')
       print "    MGT 1.0V Power Good = %d" %read_vmon_gpio('MGT_1V0_PG')
       print ""
@@ -277,18 +284,6 @@ def set_serial_number():
     manuf = defs.MANUF['Digicom']
   done = False
   while not done:
-    rev = raw_input("    Select ROACH2 revision (default = 1): ")
-    try:
-      rev = int(rev)
-      if rev not in range(1,3):
-        print ('    Revision %d not supported' %rev)
-      else:
-        done = True
-    except ValueError:
-      rev = 1
-      done = True
-  done = False
-  while not done:
     batch = raw_input("    Batch Number (0-255): ")
     try:
       batch = int(batch)
@@ -312,7 +307,7 @@ def set_serial_number():
   sn = {     
         'manufacturer' : manuf, 
         'type'         : 0x01, 
-        'revision'     : rev, 
+        'revision'     : REV,
         'batch'        : batch, 
         'board'        : board 
   } 
@@ -405,6 +400,23 @@ def ftdi_write(interface, data, retries = 3):
       time.sleep(0.5)
   return res
 
+def power_force(ftdi_obj, state):
+    # Rev1: force power on: PCTRL_EN (bit5), PCTRL_ONn (bit4)
+    # Rev2: force power on: PCTRL_EN (bit5), PCTRL_ON (bit4) 
+    rev1_on = '\x20'
+    rev1_off = '\x30'
+    rev2_on = '\x30'
+    rev2_off = '\x20'
+    if REV == 1 and state == 'on':
+      byte = rev1_on
+    elif REV == 1 and state == 'off':
+      byte = rev1_off
+    elif REV == 2 and state == 'on':
+      byte = rev2_on
+    else:
+      byte = rev2_off
+    return ftdi_write(ftdi_obj, byte)
+
 def test_power():
   try:
     f = open_ftdi_d()
@@ -412,24 +424,30 @@ def test_power():
     raise
   try:
     print '    Testing power force on.'
-    # enable PCTRL_EN and PCTRL_ONn lines on ftdi interface D
+    # Rev1: enable PCTRL_EN and PCTRL_ONn lines on ftdi interface D
+    # Rev2: enable PCTRL_EN and PCTRL_ON lines on ftdi interface D
     res = ftdi.ftdi_set_bitmode(f, 0x30, ftdi.BITMODE_BITBANG)
     if res <> 0:
       raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
-    # force power on: PCTRL_EN = 1, PCTRL_ONn = 0, 
-    if ftdi_write(f, '\x20') <> 1:
+    
+    # Forcing board on and checking ATX power good
+    print '        Forcing board on...', 
+    res = power_force(f, 'on')
+    if res <> 1:
       raise Exception('ERROR: FTDI write error, code: %d' %res)
-    print '        Board forced on...', 
     time.sleep(defs.PG_DELAY)
-    # check ATX_PG
-    if not read_vmon_gpio('ATX_PG'):
-      raise Exception, 'FATAL: Board did not power up on power force on.'
+    # check ATX_PWR_OK
+    if not read_vmon_gpio('ATX_PWR_OK'):
+      raise Exception('FATAL: Board did not power up on power force on.')
     print 'done.'
+
+    # Checking voltages
     print '    Checking voltage tolerances...',
     v_err = check_voltages()
     if v_err:
       print 'FATAL: Voltage error detected, forcing board off'
-      if ftdi_write(f, '\x30') <> 1:
+      res = power_force(f, 'off')
+      if res <> 1:
         raise Exception('FATAL: Voltages out of range: %s, AND FTDI write ERROR, code: %d, WARNING: Board did not switch off, switch off manually!' %(v_err, res))
       raise Exception, ('FATAL: Voltages out of range: %s' %v_err)
     print 'done.'
@@ -437,39 +455,54 @@ def test_power():
     sys.stdout.flush()
     time.sleep(1)
     print 'done.'
+
+    # Checking currents
     print '    Checking unconfigured current tolerances...',
     c_err = check_currents(defs.UC_C_THRESHOLD)
     if c_err:
       print 'FATAL: Unconfigured current tolerance error detected, forcing board off'
-      if ftdi_write(f, '\x30') <> 1:
-        raise Exception('ERROR: FTDI write error, code: %d' %res)
+      res = power_force(f, 'off')
+      if res <> 1:
+        raise Exception('FATAL: Currents out of range: %s, AND FTDI write ERROR, code: %d, WARNING: Board did not switch off, switch off manually!' %(c_err, res))
+      raise Exception, ('FATAL: Currents out of range: %s' %c_err)
     print 'done.'
+
+    # Checking temperatures
     print '    Checking temperatures...',
     t_err = check_temps()
     if t_err:
       print 'FATAL: Temperature sensor\s out of range, forcing board off'
-      if ftdi_write(f, '\x30') <> 1:
+      res = power_force(f, 'off')
+      if res <> 1:
         raise Exception('FATAL: Temperature sensor\s out of range: %s, AND FTDI write ERROR, code: %d, WARNING: Board did not switch off, switch off manually!' %(t_err, res))
       raise Exception, ('FATAL: Temperature sensor\s out of range: %s' %t_err)
     print 'done.'
     print_v_c()
     print_temps()
+
+    # Forcing board off and checking ATX power good   
     print '    Forcing board off...',
-    if ftdi_write(f, '\x30') <> 1:
+    res = power_force(f, 'off')
+    if res <> 1:
       raise Exception('ERROR: FTDI write error, code: %d' %res)
-    on = True
-    while on:
-      on = read_vmon_gpio('ATX_PG')
+    time.sleep(defs.PG_DELAY)
+    # check ATX_PWR_OK
+    if read_vmon_gpio('ATX_PWR_OK'):
+      raise Exception('FATAL: Board did not power down on power force off.')
     print 'done.'
+
+    # Restoring normal power control
     print '    Disabling power force...',
     if ftdi_write(f, '\x00') <> 1:
       raise Exception('ERROR: FTDI write error, code: %d' %res)
+
+    # Enabling PB_CTRL (power button) and simulating presses
     res = ftdi.ftdi_set_bitmode(f, 0x40, ftdi.BITMODE_BITBANG)
     if res <> 0:
       raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
     print 'done.'
     time.sleep(0.5)
-    curr_state = read_vmon_gpio('ATX_PG')
+    curr_state = read_vmon_gpio('ATX_PWR_OK')
     print '    Current board state is %s.' %state[curr_state]
     print '    Simulating power button press...'
     press_pb('on')
@@ -604,7 +637,7 @@ def press_pb(request):
     raise
   try:
     pb_dic = {'on' : 1, 'off' : 0}
-    curr_state = read_vmon_gpio('ATX_PG')
+    curr_state = read_vmon_gpio('ATX_PWR_OK')
     if curr_state == pb_dic[request]:
       print '    Board is currently %s' %request
     else:
@@ -614,11 +647,11 @@ def press_pb(request):
         raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
       if ftdi_write(f, '\x40') <> 1:
         raise Exception('ERROR: FTDI write error, code: %d' %res)
-      # poll ATX_PG until board state changes
+      # poll ATX_PWR_OK until board state changes
       new_state = curr_state
       tout = 0
       while (new_state == curr_state) and (tout < 7):
-        new_state = read_vmon_gpio('ATX_PG')
+        new_state = read_vmon_gpio('ATX_PWR_OK')
         time.sleep(0.5)
         tout = tout + 1
       if ftdi_write(f, '\x00') <> 1:
@@ -632,7 +665,12 @@ if __name__ == "__main__":
 
   os.system('clear')
 
-  sn = defs.SN
+  # There are many differences between ROACH2 Rev 1 and 2. Select which version to test here.
+  REV = 2 
+  if REV == 1:
+    sn = defs.SN_REV1
+  else:
+    sn = defs.SN_REV2
   ser_port = '/dev/ttyUSB2'
   baud = 115200
   state = ['off', 'on']
@@ -715,7 +753,7 @@ if __name__ == "__main__":
   # print_menu and menu_refresh is used to only reprint the menu when something changes.
   print_menu = True
   menu_refresh = False
-  menu_text = 'Main Menu - ' + c.WARNING + 'USB not connected' + c.ENDC
+  menu_text = 'ROACH2 Rev %d Testing - ' %REV + c.WARNING + 'USB not connected' + c.ENDC
   # Set default print colours
   col = DEF_C.copy()
 
@@ -744,7 +782,7 @@ if __name__ == "__main__":
     try:
       # Reset colours and flags on USB disconnect
       if usb_disc:
-        menu_text = 'Main Menu - ' + c.WARNING + 'USB not connected' + c.ENDC
+        menu_text = 'ROACH2 Rev %d Testing - ' %REV + c.WARNING + 'USB not connected' + c.ENDC
         col = DEF_C.copy()
         sn_set = False
         power_teset = False
@@ -770,7 +808,7 @@ if __name__ == "__main__":
       if usb_conn and (not menu_refresh):
         print_menu = True
         menu_refresh = True
-        menu_text = 'Main Menu - ' + c.OKGREEN + 'USB connected' + c.ENDC
+        menu_text = 'ROACH2 Rev %d Testing - ' %REV + c.OKGREEN + 'USB connected' + c.ENDC
         os.system('clear')
       if sn_set:
         col['1'] = c.OKGREEN
@@ -881,7 +919,7 @@ if __name__ == "__main__":
         print_menu = True
       elif '5' in answer:
         print_vc = False
-        curr_state = read_vmon_gpio('ATX_PG')
+        curr_state = read_vmon_gpio('ATX_PWR_OK')
         print c.OKBLUE + ('\n    Current board state is %s.' %state[curr_state]) + c.ENDC
         print_v_c()
         print_temps()
