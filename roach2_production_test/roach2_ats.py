@@ -573,9 +573,9 @@ def find_str_ser(serial_obj, string, timeout, display = True):
       srch = buff.find(string)
       tout = 0
   if srch == -1:
-    return False
+    return False, buff
   else:
-    return True
+    return True, buff
 
 def print_outp_ser(serial_obj, timeout):
   #serial_obj.flushOutput()
@@ -602,8 +602,8 @@ def check_ppc_i2c():
     raise
   try:
     i2c_avbl = False
-    if find_str_ser(serial_obj, 'DRAM:', 4, False):
-      if find_str_ser(serial_obj, 'stop autoboot:', defs.UBOOT_DELAY*10, False):
+    if find_str_ser(serial_obj, 'DRAM:', 4, False)[0]:
+      if find_str_ser(serial_obj, 'stop autoboot:', defs.UBOOT_DELAY*10, False)[0]:
         serial_obj.write('\n')
         i2c_avbl = True
       else:
@@ -614,11 +614,11 @@ def check_ppc_i2c():
       tout = 0
       while (not i2c_avbl) and (tout < defs.BOOT_DELAY*10):
         serial_obj.write('\n')
-        if find_str_ser(serial_obj, '=>', 1*10, False):
+        if find_str_ser(serial_obj, '=>', 1*10, False)[0]:
           i2c_avbl = True
         else:
           serial_obj.write('\n')
-          if find_str_ser(serial_obj, 'login:', 1*10, False):
+          if find_str_ser(serial_obj, 'login:', 1*10, False)[0]:
             i2c_avbl = True
         tout += 1
       if not i2c_avbl:
@@ -657,6 +657,7 @@ def press_pb(request):
         tout = tout + 1
       if ftdi_write(f, '\x00') <> 1:
         raise Exception('ERROR: FTDI write error, code: %d' %res)
+      # More than 4 seconds elapsed, board should have switched state by now.
       if tout >= 7:
         raise Exception, ('Power button did not have an effect.')
   finally:
@@ -930,6 +931,7 @@ if __name__ == "__main__":
         print_vc = False
         curr_state = read_vmon_gpio('ATX_PWR_OK')
         print c.OKBLUE + ('\n    Current board state is %s.' %state[curr_state]) + c.ENDC
+        config_mon()
         print_v_c()
         print_temps()
         print_vc = True
@@ -1054,13 +1056,13 @@ if __name__ == "__main__":
             if not xio.xmdm_send():
               print 'Elapsed: %f' %(time.time() - start_time)
               raise Exception('FATAL: U-Boot Xmodem transfer not successfull.')
-            if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY):
+            if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)[0]:
               raise  Exception('FATAL: U-Boot did not boot after x-modem transfer.')
             ser.write('\n')
             ser.write('run clearenv\n')
             print_outp_ser(ser, 1)
             ser.write('reset\n')
-            if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY):
+            if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)[0]:
               raise Exception('FATAL: U-Boot did not boot after reset.')
             ser.write('\n')
             ser.write('saveenv\n')
@@ -1072,11 +1074,11 @@ if __name__ == "__main__":
               press_pb('off')
               press_pb('on')
             ser.write('run tftpkernel\n')
-            if not find_str_ser(ser, 'Waiting for PHY', 1):
+            if not find_str_ser(ser, 'Waiting for PHY', 1)[0]:
               raise Exception('ERROR: U-Boot not loaded, load U-Boot before loading kernel.')
-            if not find_str_ser(ser, 'DHCP client bound to address', 60):
+            if not find_str_ser(ser, 'DHCP client bound to address', 60)[0]:
               raise Exception('ERROR: IP address not assigned, check connections and DHCP server.')
-            if not find_str_ser(ser, 'done\r\n=>', 40):
+            if not find_str_ser(ser, 'done\r\n=>', 40)[0]:
               raise Exception('ERROR: Kernel did not load.')
             kernel_load = True
           if load_all or load_root:
@@ -1085,11 +1087,11 @@ if __name__ == "__main__":
               press_pb('on')
             root_load = False
             ser.write('run tftproot\n')
-            if not find_str_ser(ser, 'Waiting for PHY', 1):
+            if not find_str_ser(ser, 'Waiting for PHY', 1)[0]:
               raise Exception('ERROR: U-Boot not loaded, load U-Boot before loading root file system.')
-            if not find_str_ser(ser, 'DHCP client bound to address', 60):
+            if not find_str_ser(ser, 'DHCP client bound to address', 60)[0]:
               raise Exception('ERROR: IP address not assigned, check connections and DHCP server.')
-            if not find_str_ser(ser, 'done\r\n=>', 5.5*60):
+            if not find_str_ser(ser, 'done\r\n=>', 5.5*60)[0]:
               raise Exception('ERROR: Root file system did not load.')
             root_load = True
         finally:
@@ -1113,7 +1115,7 @@ if __name__ == "__main__":
           press_pb('off')
           press_pb('on')
           ser.write('\n')
-          if not find_str_ser(ser, '=>', 1, False):
+          if not find_str_ser(ser, '=>', 1, False)[0]:
             raise Exception('ERROR: U-Boot did not load correctly after powerup.')
           print '    Dumping CPLD mapped memory to confirm CPLD configuration.'  
           ser.write('md 0xc0000000 8\n')
@@ -1137,17 +1139,16 @@ if __name__ == "__main__":
           ser.flushOutput()
           print '    Checking PPC state...',
           ser.write('\n')
-          if find_str_ser(ser, 'login:', 1, False):
+          if find_str_ser(ser, 'login:', 1, False)[0]:
             print 'Linux booted.'
           else:
             print 'Linux not booted, cycling power.'
             press_pb('off')
             press_pb('on')
             print '    Waiting for Linux to boot...',
-            if find_str_ser(ser, 'login:', defs.BOOT_DELAY , False):
-              print 'Linux booted.'
-            else:
-              raise Exception('ERROR: Linux not loaded or did not boot correctly.')
+            sys.stdout.flush()
+            if not find_str_ser(ser, 'obtained, lease time', defs.BOOT_DELAY , False)[0]:
+              raise Exception('ERROR: Linux not loaded or did not boot correctly or IP address not leased.')
           qdr_ok = True
         finally:
           ser.close()
@@ -1161,8 +1162,12 @@ if __name__ == "__main__":
           print c.OKBLUE + '\n    Running preliminary DDR3, ZDOK, TGE and 1GE tests.' + c.ENDC
           press_pb('off')
           press_pb('on')
+          ser.write('\n')
+          if not find_str_ser(ser, '=>', 1, False)[0]:
+            raise Exception('ERROR: U-Boot did not load correctly after powerup.')
           ser.write('dhcp\n')
-          find_str_ser(ser, 'Bytes transferred', 10)
+          if not find_str_ser(ser, 'Bytes transferred', 10)[0]:
+            raise Exception('DHCP request not successful.')
           time.sleep(0.5)
           ser.write('tftp 100000 roach2_bsp.bin\n')
           print_outp_ser(ser, 2)
@@ -1194,26 +1199,23 @@ if __name__ == "__main__":
           press_pb('off')
           press_pb('on')
           # Scan the USB bus 5 times, u-boot sometimes takes a while to detect the USB drive
-          found = False
           retry = 0
-          while (not found) & (retry < 5):
+          while not find_str_ser(ser, '1 Storage Device(s) found', 3)[0]:
             ser.write('usb start\n')
-            out = find_str_ser(ser, '1 Storage Device(s) found', 3)
-            if out.find('$#NOT_FOUND$#') == -1:
-              found = True
-          if retry == 5:
-            raise Exception ('FATAL: USB flash drive not detected.')
+            retry += 1
+            if retry == 5:
+              raise Exception('ERROR: USB flash drive not detected.')
           ser.write('fatload usb 0 100000 roach2_bsp.bin\n')
           print ''
           print ''
           print 'Reading from USB flash drive, this will take about a minute.'
           print ''
-          find_str_ser(ser, '19586188 bytes read', 60)
+          if not find_str_ser(ser, '19586188 bytes read', 60, True)[0]:
+            raise Exception('ERROR: File not loaded successfully from USB drive')
           time.sleep(0.1)
           ser.write('r2smap 100000\n')
-          out = find_str_ser(ser, 'info: SelectMAP configuration succeeded', 5)
-          if out.find('$#NOT_FOUND$#') <> -1:
-            raise Exception ('FATAL: USB transfer failed.')
+          if not find_str_ser(ser, 'info: SelectMAP configuration succeeded', 5, True)[0]:
+            raise Exception('ERROR: SelectMAP configuration failed.')
           print ''
           print 'USB host working correctly.'
           test_usb = True
