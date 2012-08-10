@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os, sys, time, select, termios, tty, ftdi, subprocess, serial, logging
+import os, sys, time, select, termios, tty, ftdi, subprocess, serial, logging, shutil, telnetlib
 from optparse import OptionParser
 from mpsse import *
 import i2c_functions as iicf
@@ -8,6 +8,7 @@ import xmodem_tx as xtx
 import defs_max16071, defs_max1805, defs_ad7414
 import defs_r2_ats as defs
 from bcolours import bcolours as c
+import corr
 
 def config_mon():
   try:
@@ -648,7 +649,7 @@ def press_pb(request):
         raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
       if ftdi_write(f, '\x40') <> 1:
         raise Exception('ERROR: FTDI write error, code: %d' %res)
-      # poll ATX_PWR_OK until board state changes
+      # poll ATX_PWR_OK until board state changes, timeout = 7 x 0.5 seconds
       new_state = curr_state
       tout = 0
       while (new_state == curr_state) and (tout < 7):
@@ -662,6 +663,57 @@ def press_pb(request):
         raise Exception, ('Power button did not have an effect.')
   finally:
     ftdi.ftdi_usb_close(f)
+
+def get_assigned_ip(ser_obj):
+  print '    Checking PPC state...',
+  ser_obj.write('\n')
+  #Determine if boffile is present to see if system already netbooted.
+  found, buff = find_str_ser(ser_obj, '~#', 1, False)
+  linux_booted = False
+  if buff.find('login:') <> -1:
+    ser_obj.write('root\n')
+    time.sleep(0.1)
+    ser_obj.flushInput()
+    ser_obj.flushOutput()
+    linux_booted = True
+  elif found:
+    linux_booted = True
+  if linux_booted:
+    ser_obj.write('\n\n')
+    ser_obj.write('ls /boffiles/%s'%defs.QDR_TST_BOF)
+    if find_str_ser(ser_obj, 'cannot access', 1, False)[0]:
+      linux_booted = False
+  if not linux_booted:
+    print 'Linux not booted, cycling power and net booting.'
+    press_pb('off')
+    press_pb('on')
+    ser_obj.write('run netboot\n')
+    print '    Waiting for Linux to net boot, this may take a minute...',
+    sys.stdout.flush()
+    if not find_str_ser(ser_obj, 'login:', defs.BOOT_DELAY , False)[0]:
+      raise Exception('ERROR: Linux did not boot correctly.')
+    ser_obj.write('root\n')
+    time.sleep(0.1)
+    ser_obj.flushInput()
+    ser_obj.flushOutput()
+    ser_obj.write('\n\n')
+    ser_obj.write('ls /boffiles/%s'%defs.QDR_TST_BOF)
+    if find_str_ser(ser_obj, 'cannot access', 1, False)[0]:
+      raise Exception('ERROR: Boffile not found, check NFS directory.')
+    print 'done.'
+  else:
+    print 'Linux booted.'
+  # Get assigned IP address
+  ser_obj.flushInput()
+  ser_obj.flushOutput()
+  ser_obj.write('\n\n')
+  ser_obj.write('/sbin/ifconfig\n')
+  found, buff = find_str_ser(ser_obj, 'UP BROADCAST RUNNING', 1, False)
+  if not found:
+      raise Exception('ERROR: Linux not loaded or did not boot correctly or IP address not leased.')
+  start_idx = buff.find('inet addr:') + 10
+  stop_idx = buff.find('Bcast:') - 1 
+  return buff[start_idx:stop_idx]
 
 if __name__ == "__main__":
   
@@ -870,7 +922,7 @@ if __name__ == "__main__":
         print col['6'] + '    6) Scan JTAG chain' + c.ENDC
         print col['7'] + '    7) Program EEPROM' + c.ENDC
         print col['8'] + '    8) Display EEPROM contents' + c.ENDC
-        print col['9'] + '    9) Test FLASH memory' + c.ENDC
+        print col['9'] + '    9) Test FLASH and PPC DDR2 memory' + c.ENDC
         print col['0'] + '    0) Load U-boot, kernel and filesystem' + c.ENDC
         print col['w'] + '    w) Program CPLD' + c.ENDC
         print col['e'] + '    e) Test QDR memory' + c.ENDC
@@ -988,7 +1040,7 @@ if __name__ == "__main__":
         else:
           raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), EEPROM contents not read.')
       elif '9' in answer:
-        print c.OKBLUE + ('\n    Checking FLASH memory.') + c.ENDC
+        print c.OKBLUE + ('\n    Checking FLASH and PPC DDR2 memory.') + c.ENDC
         try:
           ser = open_ftdi_uart(ser_port, baud)
         except:
@@ -999,22 +1051,23 @@ if __name__ == "__main__":
           press_pb('on')
           print '    Loading flash checking program via JTAG, this will take while...'
           load_ppc('support_files/flashck.mac')
-          tout = 0
-          buff = []
-          while tout < 3:
-            res = ser.read(1)
-            if res == '':
-              tout = tout + 1
-            else:
-              sys.stdout.write(res)
-              sys.stdout.flush()
-              buff.append(res)
-              tout = 0
-          out = ''.join(buff)
-          if out.find('pass') == -1:
+          if not find_str_ser(ser, 'pass', 3)[0]:
             raise Exception, ('FATAL: FLASH memory test failed.')
-          print 'FLASH memory test passed.'
-          print ''
+          print c.OKBLUE + ('\n\n    FLASH memory test passed.\n') + c.ENDC
+          if REV == 1:
+            xio = xtx.Xmodem_tx(ser, defs.UBOOT_REV1_MEMTEST, fh)
+          else:
+            xio = xtx.Xmodem_tx(ser, defs.UBOOT_REV2_MEMTEST, fh)
+          print '    Loading DDR2 checking program via JTAG, this will take while...'
+          load_ppc('support_files/program.mac')
+          print '    Sending U-Boot via Xmodem.'
+          if not xio.xmdm_send():
+            raise Exception('FATAL: U-Boot Xmodem transfer not successfull.')
+          if not find_str_ser(ser, 'SDRAM test passes', 1)[0]:
+            raise  Exception('FATAL: PPC DDR2 memory test failed.')
+          print c.OKBLUE + ('\n\n    PPC DDR2 memory test passed.') + c.ENDC
+          print '\n    Clearing PPC.'
+          load_ppc('support_files/program.mac')
           flash_chk = True
         finally:
           ser.close()
@@ -1048,7 +1101,10 @@ if __name__ == "__main__":
             uoot_load = False
             press_pb('off')
             press_pb('on')
-            xio = xtx.Xmodem_tx(ser, defs.UBOOT_PATH, fh)
+            if REV == 1:
+              xio = xtx.Xmodem_tx(ser, defs.UBOOT_REV1, fh)
+            else:
+              xio = xtx.Xmodem_tx(ser, defs.UBOOT_REV2, fh)
             print '    Loading rinit (PPC Xmodem receiver program) via JTAG, this will take while...'
             load_ppc('support_files/program.mac')
             start_time = time.time()
@@ -1087,7 +1143,7 @@ if __name__ == "__main__":
               press_pb('on')
             root_load = False
             ser.write('run tftproot\n')
-            if not find_str_ser(ser, 'Waiting for PHY', 1)[0]:
+            if not find_str_ser(ser, 'ENET Speed is', 1)[0]:
               raise Exception('ERROR: U-Boot not loaded, load U-Boot before loading root file system.')
             if not find_str_ser(ser, 'DHCP client bound to address', 60)[0]:
               raise Exception('ERROR: IP address not assigned, check connections and DHCP server.')
@@ -1137,18 +1193,38 @@ if __name__ == "__main__":
           qdr_ok = False
           ser.flushInput()
           ser.flushOutput()
-          print '    Checking PPC state...',
-          ser.write('\n')
-          if find_str_ser(ser, 'login:', 1, False)[0]:
-            print 'Linux booted.'
-          else:
-            print 'Linux not booted, cycling power.'
-            press_pb('off')
-            press_pb('on')
-            print '    Waiting for Linux to boot...',
-            sys.stdout.flush()
-            if not find_str_ser(ser, 'obtained, lease time', defs.BOOT_DELAY , False)[0]:
-              raise Exception('ERROR: Linux not loaded or did not boot correctly or IP address not leased.')
+          ip_addr = get_assigned_ip(ser)
+          print('    Connecting to TCPBorph server on %s... '%(ip_addr)),
+          sys.stdout.flush()
+          fpga = corr.katcp_wrapper.FpgaClient(ip_addr, logger = logger)
+          time.sleep(1)
+          if not fpga.is_connected():
+            raise Exception('ERROR: Connection to TCPBorph server not successful.')
+          print 'done.'
+          print '    Configuring FPGA...',
+          sys.stdout.flush()
+          try:
+            with open('/home/nfs/roach2/current/boffiles/%s'%defs.QDR_TST_BOF) as f: pass
+          except:
+            inpath = 'support_files/%s'%defs.QDR_TST_BOF
+            outpath = '/home/nfs/roach2/current/boffiles/%s'%defs.QDR_TST_BOF
+            shutil.copyfile(inpath, outpath)
+            os.chmod(outpath, 0777)
+          try:
+            teln = telnetlib.Telnet(ip_addr, 7147)
+          except:
+            raise
+          teln.write('?progdev %s\n'%defs.QDR_TST_BOF)
+          # TODO: Don't just sleep, wait in a timeout loop for programming to finish
+          time.sleep(5)
+          response = teln.read_very_eager()
+          if response.find('!progdev ok') == -1:
+            teln.close()
+            raise Exception('ERROR: Boffile not programmed. Error message:\n%s'%response)
+          print 'boffile programmed.'
+          teln.close()
+          sys.stdout.flush()
+                                                    
           qdr_ok = True
         finally:
           ser.close()

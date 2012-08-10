@@ -164,7 +164,13 @@ CONFIG_G_BOOT = [0x87, 0x78, 0x52, 0x4e, 0x0d, 0x57, 0xa0, 0x30, 0x40, 0x08, 0x2
 BSDL_PATH = 'support_files/bsdl'
 
 #U-boot path
-UBOOT_PATH = '/home/nfs/roach2/boot/u-boot.bin'
+UBOOT_REV1 = '/home/nfs/roach2/boot/u-boot-r2-rev1.bin'
+UBOOT_REV1_MEMTEST = '/home/nfs/roach2/boot/u-boot-memtest-r2-rev1.bin'
+UBOOT_REV2 = '/home/nfs/roach2/boot/u-boot-r2-rev2.bin'
+UBOOT_REV2_MEMTEST = '/home/nfs/roach2/boot/u-boot-memtest-r2-rev2.bin'
+
+#QDR test boffile
+QDR_TST_BOF = 'qdr_tst_r2_2x_2012_May_07_1216.bof'
 
 # Set xilinx source path
 XILINX_SRC_PATH = '/opt/Xilinx/12.4/LabTools/settings64.sh'
