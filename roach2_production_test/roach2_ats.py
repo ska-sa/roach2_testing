@@ -1228,11 +1228,15 @@ if __name__ == "__main__":
             teln.close()
             raise Exception('ERROR: Boffile not programmed. Error message:\n%s'%response)
           print 'boffile programmed.'
+          proc = subprocess.Popen(['python', 'qdr_tst.py', ip_addr]) #, stdout=subprocess.PIPE)
+          #out = proc.communicate()[0]
           teln.close()
           sys.stdout.flush()
                                                     
           qdr_ok = True
         finally:
+          try: for f in fpga: f.close()
+          except: pass
           ser.close()
           print_menu = True
       elif 'r' in answer:
