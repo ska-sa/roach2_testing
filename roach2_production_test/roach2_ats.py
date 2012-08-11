@@ -1215,10 +1215,16 @@ if __name__ == "__main__":
           except:
             raise
           teln.write('?progdev %s\n'%defs.QDR_TST_BOF)
-          # TODO: Don't just sleep, wait in a timeout loop for programming to finish
-          time.sleep(5)
-          response = teln.read_very_eager()
-          if response.find('!progdev ok') == -1:
+          timeout = 0
+          found = False
+          response = ''
+          while not found and timeout < 10:
+            time.sleep(1)
+            timeout += 1
+            response = response + teln.read_very_eager()
+            if response.find('!progdev ok') <> -1:
+              found = True
+          if not found:
             teln.close()
             raise Exception('ERROR: Boffile not programmed. Error message:\n%s'%response)
           print 'boffile programmed.'
