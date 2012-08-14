@@ -2,12 +2,12 @@
 
 import corr, time, struct, sys, logging, socket, telnetlib
 import construct
-import defs_r2_ats as defs
 
 
 
+# Tests to be performed
+test_string = ['Address','A5','F0','Walking 0s','Walking 1s','Pseudo Random Number']
 
-    
 #******************************************************************************************************************
 # Test execution for specified:
 #
@@ -25,7 +25,7 @@ import defs_r2_ats as defs
 #       5 - Pseudo Random Number - LFSR is used to generate a PRN sequence (typical average operation)
 #
 #****************************************************************************************************************** 
-def exec_test(qdr,test,addr_sel):
+def exec_test(fpga, qdr, test, addr_sel, testDuration, reportLen, txrxsnapdump):
     """Test to be executed"""
     result = 0
     print '=============================================================='
@@ -125,125 +125,140 @@ def exec_test(qdr,test,addr_sel):
     result = err_cnt
     return result
 
+def exit_clean():
+    try:
+        for f in fpgas: f.stop()
+    except: pass
+    try:
+        for t in teln: t.close()
+    except: pass
+
 def test_qdr(roachIP, boffile, testDuration = 1, reportLen = 10, txrxsnapdump = 0):
-"""Test QDR's
+  """Test QDR's
 
-Keyword arguments:
-roachIP -- ROACH2 ip address string (netbooted)
-boffile -- Boffile to program
-testDuration -- Specifies the test duration
-reportLen -- Specifies the ammount of errors to report
-txrxsnapdump -- Number of snap blocks to display
+  Keyword arguments:
+  roachIP -- ROACH2 ip address string (netbooted)
+  boffile -- Boffile to program
+  testDuration -- Specifies the test duration
+  reportLen -- Specifies the ammount of errors to report
+  txrxsnapdump -- Number of snap blocks to display
 
-"""
+  """
 
-errors = [0,0,0,0]
-qdr_fail = [0,0,0,0]
-num_qdr = 4
-# Tests to be performed
-test_string = ['Address','A5','F0','Walking 0s','Walking 1s','Pseudo Random Number']
-fpga = []
-    
-    
-try:
-    lh=corr.log_handlers.DebugLogHandler()
-    logger = logging.getLogger(roach)
-    logger.addHandler(lh)
-    logger.setLevel(10)
+  errors = [0,0,0,0]
+  qdr_fail = [0,0,0,0]
+  num_qdr = 4
+  fpga = []
+      
+      
+  try:
+      lh=corr.log_handlers.DebugLogHandler()
+      logger = logging.getLogger('R2_QDR_Testing')
+      logger.addHandler(lh)
+      logger.setLevel(10)
 
-    print('    Connecting to TCPBorph server on %s... '%(roachIP)),
-    sys.stdout.flush()
-    fpga = corr.katcp_wrapper.FpgaClient(roachIP, logger = logger)
-    time.sleep(1)
-    if not fpga.is_connected():
-      raise Exception('ERROR: Connection to TCPBorph server not successful.')
-    print 'done.'
-    print '    Configuring FPGA...',
-    sys.stdout.flush()
-    try:
-      with open('/home/nfs/roach2/current/boffiles/%s'%defs.QDR_TST_BOF) as f: pass
-    except:
-      inpath = 'support_files/%s'%defs.QDR_TST_BOF
-      outpath = '/home/nfs/roach2/current/boffiles/%s'%defs.QDR_TST_BOF
-      shutil.copyfile(inpath, outpath)
-      os.chmod(outpath, 0777)
-    try:
-      teln = telnetlib.Telnet(ip_addr, 7147)
-    except:
-      raise
-    teln.write('?progdev %s\n'%defs.QDR_TST_BOF)
-    timeout = 0
-    found = False
-    response = ''
-    while not found and timeout < 10:
+      print('    Connecting to TCPBorph server on %s... '%(roachIP)),
+      sys.stdout.flush()
+      fpga = corr.katcp_wrapper.FpgaClient(roachIP, logger = logger)
       time.sleep(1)
-      timeout += 1
-      response = response + teln.read_very_eager()
-      if response.find('!progdev ok') <> -1:
-        found = True
-    if not found:
+      if not fpga.is_connected():
+        raise Exception('ERROR: Connection to TCPBorph server not successful.')
+      print 'done.'
+      print '    Configuring FPGA...',
+      sys.stdout.flush()
+      try:
+        with open('/home/nfs/roach2/current/boffiles/%s'%boffile) as f: pass
+      except:
+        inpath = 'support_files/%s'%boffile
+        outpath = '/home/nfs/roach2/current/boffiles/%s'%boffile
+        shutil.copyfile(inpath, outpath)
+        os.chmod(outpath, 0777)
+      try:
+        teln = telnetlib.Telnet(roachIP, 7147)
+      except:
+        raise
+      teln.write('?progdev %s\n'%boffile)
+      timeout = 0
+      found = False
+      response = ''
+      while not found and timeout < 10:
+        time.sleep(1)
+        timeout += 1
+        response = response + teln.read_very_eager()
+        if response.find('!progdev ok') <> -1:
+          found = True
+      if not found:
+        teln.close()
+        raise Exception('ERROR: Boffile not programmed. Error message:\n%s'%response)
+      print 'boffile programmed.'
       teln.close()
-      raise Exception('ERROR: Boffile not programmed. Error message:\n%s'%response)
-    print 'boffile programmed.'
-    teln.close()
-    sys.stdout.flush()
+      sys.stdout.flush()
 
-    print '---------------------------------'
-    print ' Checking QDR Calibration Status '  
-    print '---------------------------------'
-    
+      print '---------------------------------'
+      print ' Checking QDR Calibration Status '  
+      print '---------------------------------'
+      
 #   Check that QDR's are calibrated and ready before doing any tests!   
-    for qdr in range(0, num_qdr):       
-       cal_fail=fpga.read_int('cal_fail{0}'.format(qdr))
-       if cal_fail != 0:
-          qdr_fail[qdr] = 1     
-          print ('>>>>>ERR: QDR {0} '.format(qdr)+' did NOT calibrate! Skipping tests.')
-          time.sleep(1)          
-#          exit_fail()          
-          
-       phy_ready=fpga.read_int('phy_rdy{0}'.format(qdr))
-       if phy_ready != 1:
-          qdr_fail[qdr] = 1
-          print ('>>>>>ERR: QDR {0} '.format(qdr)+' is not ready! Skipping tests.')
-          time.sleep(1)
-#          exit_fail()
-                        
-    print '---------------------------------'
-    print ' Incremental Address Test Suite  '  
-    print '---------------------------------'       
+      for qdr in range(0, num_qdr):       
+         cal_fail=fpga.read_int('cal_fail{0}'.format(qdr))
+         if cal_fail != 0:
+            qdr_fail[qdr] = 1     
+            print ('>>>>>ERR: QDR {0} '.format(qdr)+' did NOT calibrate! Skipping tests.')
+            time.sleep(1)          
+            
+         phy_ready=fpga.read_int('phy_rdy{0}'.format(qdr))
+         if phy_ready != 1:
+            qdr_fail[qdr] = 1
+            print ('>>>>>ERR: QDR {0} '.format(qdr)+' is not ready! Skipping tests.')
+            time.sleep(1)
+                          
+      print '---------------------------------'
+      print ' Incremental Address Test Suite  '  
+      print '---------------------------------'       
 
-    for qdr in range(0, num_qdr):
-       if qdr_fail[qdr] == 0:  
-          for test in range(0, 6):
-             err_cnt_tmp = exec_test(qdr,test,0)
-#   Global error count
-             errors[qdr] = errors[qdr] + err_cnt_tmp
+      for qdr in range(0, num_qdr):
+         if qdr_fail[qdr] == 0:  
+            for test in range(0, 6):
+               err_cnt_tmp = exec_test(fpga, qdr, test, 0, testDuration, reportLen, txrxsnapdump)
+               #   Global error count
+               errors[qdr] = errors[qdr] + err_cnt_tmp
+         
+      print '---------------------------------'
+      print ' Random Address Test Suite       '  
+      print '---------------------------------'
        
-    print '---------------------------------'
-    print ' Random Address Test Suite       '  
-    print '---------------------------------'
-     
-    for qdr in range(0, num_qdr): 
-       if qdr_fail[qdr] == 0: 
-          for test in range(0, 6):
-             err_cnt_tmp = exec_test(qdr,test,16)
-#   Global error count
-             errors[qdr] = errors[qdr] + err_cnt_tmp  
-          
-    for qdr in range(0, num_qdr):
-       if qdr_fail[qdr] == 0:                  
-          print 'Summary QDR {0}: '.format(qdr)+'Total Test Errors:  {0}'.format(errors[qdr]) 
-       else:
-          print 'Summary QDR {0}: '.format(qdr)+'No tests performed due to calibration failure!'
-    print '---------------------------------'
-    print ' Test Suite Done                 '  
-    print '---------------------------------'      
-       
-except KeyboardInterrupt:
-    exit_clean()
-except:
-    exit_fail()
+      for qdr in range(0, num_qdr): 
+         if qdr_fail[qdr] == 0: 
+            for test in range(0, 6):
+               err_cnt_tmp = exec_test(fpga, qdr, test, 16, testDuration, reportLen, txrxsnapdump)
+               #   Global error count
+               errors[qdr] = errors[qdr] + err_cnt_tmp  
 
-exit_clean()
+      print ''
+      print '---------------------------------'
+      print ' Test Summary                    '  
+      print '---------------------------------'
+            
+      for qdr in range(0, num_qdr):
+         if qdr_fail[qdr] == 0:                  
+            print 'QDR {0}: '.format(qdr)+'Total Test Errors:  {0}'.format(errors[qdr]) 
+         else:
+            print 'QDR {0}: '.format(qdr)+'No tests performed due to calibration failure!'
+         
+  except KeyboardInterrupt:
+      exit_clean()
+  except:
+      #exc_type = sys.exc_info()[0]
+      #exc_mess = sys.exc_info()[1]
+      #print 'Exception type: %s Message: %s' %(exc_type, exc_mess)
+      exit_clean()
+      raise
+
+  exit_clean()
+  # Add qdr_fail and error lists together to determine if any errors occured.
+  if (reduce(lambda x,y: x+y, qdr_fail) + reduce(lambda x,y: x+y, errors)):
+    return False
+  else:
+    return True
 
 

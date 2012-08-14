@@ -8,6 +8,7 @@ import xmodem_tx as xtx
 import defs_max16071, defs_max1805, defs_ad7414
 import defs_r2_ats as defs
 from bcolours import bcolours as c
+import qdr_tst
 import corr
 
 def config_mon():
@@ -1194,48 +1195,10 @@ if __name__ == "__main__":
           ser.flushInput()
           ser.flushOutput()
           ip_addr = get_assigned_ip(ser)
-          print('    Connecting to TCPBorph server on %s... '%(ip_addr)),
-          sys.stdout.flush()
-          fpga = corr.katcp_wrapper.FpgaClient(ip_addr, logger = logger)
-          time.sleep(1)
-          if not fpga.is_connected():
-            raise Exception('ERROR: Connection to TCPBorph server not successful.')
-          print 'done.'
-          print '    Configuring FPGA...',
-          sys.stdout.flush()
-          try:
-            with open('/home/nfs/roach2/current/boffiles/%s'%defs.QDR_TST_BOF) as f: pass
-          except:
-            inpath = 'support_files/%s'%defs.QDR_TST_BOF
-            outpath = '/home/nfs/roach2/current/boffiles/%s'%defs.QDR_TST_BOF
-            shutil.copyfile(inpath, outpath)
-            os.chmod(outpath, 0777)
-          try:
-            teln = telnetlib.Telnet(ip_addr, 7147)
-          except:
-            raise
-          teln.write('?progdev %s\n'%defs.QDR_TST_BOF)
-          timeout = 0
-          found = False
-          response = ''
-          while not found and timeout < 10:
-            time.sleep(1)
-            timeout += 1
-            response = response + teln.read_very_eager()
-            if response.find('!progdev ok') <> -1:
-              found = True
-          if not found:
-            teln.close()
-            raise Exception('ERROR: Boffile not programmed. Error message:\n%s'%response)
-          print 'boffile programmed.'
-          proc = subprocess.Popen(['python', 'qdr_tst.py', ip_addr]) #, stdout=subprocess.PIPE)
-          #out = proc.communicate()[0]
-          teln.close()
-          sys.stdout.flush()
-                                                    
-          qdr_ok = True
+          qdr_ok = qdr_tst.test_qdr(ip_addr, defs.QDR_TST_BOF)
         finally:
-          try: for f in fpga: f.close()
+          try: 
+            for f in fpga: f.close()
           except: pass
           ser.close()
           print_menu = True
@@ -1328,5 +1291,5 @@ if __name__ == "__main__":
       exc_type = sys.exc_info()[0]
       exc_mess = sys.exc_info()[1]
       print ''
-      print c.FAIL+ ("ERROR: %s Message: %s" %(exc_type, exc_mess)) + c.ENDC
+      print c.FAIL+ ("%s %s" %(exc_mess, exc_type)) + c.ENDC
       print_menu = True
