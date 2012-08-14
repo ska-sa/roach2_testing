@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import corr, time, struct, sys, logging, socket, telnetlib, shutil
+import corr, time, struct, sys, logging, socket, telnetlib, shutil, os
 import construct
 
 
