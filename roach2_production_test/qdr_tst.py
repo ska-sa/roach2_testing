@@ -1,38 +1,12 @@
 #!/usr/bin/env python
 
-import corr, time, struct, sys, logging, socket
-from corr import katcp_wrapper
+import corr, time, struct, sys, logging, socket, telnetlib
 import construct
-
-# Command line options
-boffile = '1.bof'
-testDuration = 1
-reportLen = 10
-
-
-errors = [0,0,0,0]
-
-qdr_fail = [0,0,0,0]
-
-num_qdr = 4
-
-# Tests to be performed
-test_string=['Address','A5','F0','Walking 0s','Walking 1s','Pseudo Random Number']
-
-
-fpga    = []
+import defs_r2_ats as defs
 
 
 
-def exit_fail():
-    print 'FAILURE DETECTED. Log entries:\n',lh.printMessages()
-    exit()
 
-def exit_clean():
-    try:
-        for f in fpga: f.stop()
-    except: pass
-    exit()
     
 #******************************************************************************************************************
 # Test execution for specified:
@@ -151,42 +125,24 @@ def exec_test(qdr,test,addr_sel):
     result = err_cnt
     return result
 
-if __name__ == '__main__':
-    from optparse import OptionParser
+def test_qdr(roachIP, boffile, testDuration = 1, reportLen = 10, txrxsnapdump = 0):
+"""Test QDR's
 
-    p = OptionParser()
-    p.set_usage('roach2_qdr_tst.py <ROACH_HOSTNAME_or_IP> [options]')
-    p.set_description(__doc__)
-    p.add_option('-b', '--boffile', dest='bof', type='str',
-        help='Specify the bof file to load')
-    p.add_option('-d', '--testduration', dest='td', type='int',
-        help='Specify the test duration')
-    p.add_option('-r', '--reportlen', dest='rplen', type='int',
-        help='Specify the ammount of errors to report') 
-    p.add_option('-s', '--TXRXsnapdump', dest='txrxsnapdump', type='int',
-        help='Specify the ammount of errors to report') 
-    opts, args = p.parse_args(sys.argv[1:])
+Keyword arguments:
+roachIP -- ROACH2 ip address string (netbooted)
+boffile -- Boffile to program
+testDuration -- Specifies the test duration
+reportLen -- Specifies the ammount of errors to report
+txrxsnapdump -- Number of snap blocks to display
 
-    if args==[]:
-        print 'Please specify a ROACH board. \nExiting.'
-        exit()
-    else:
-        roach = args[0]
-   
-    if opts.bof != 'None':
-       boffile = opts.bof
-    if opts.td > 0:
-       testDuration = opts.td
-    else:
-       testDuration = 1 
-    if opts.rplen > 0:
-       reportLen = opts.rplen
-    else:
-       reportLen = 4
-    if opts.txrxsnapdump > 0:
-       txrxsnapdump = opts.txrxsnapdump
-    else:
-       txrxsnapdump = 0   
+"""
+
+errors = [0,0,0,0]
+qdr_fail = [0,0,0,0]
+num_qdr = 4
+# Tests to be performed
+test_string = ['Address','A5','F0','Walking 0s','Walking 1s','Pseudo Random Number']
+fpga = []
     
     
 try:
@@ -195,29 +151,43 @@ try:
     logger.addHandler(lh)
     logger.setLevel(10)
 
-    print('Connecting to server %s... '%(roach)),
-    fpga = corr.katcp_wrapper.FpgaClient(roach, logger=logger)
+    print('    Connecting to TCPBorph server on %s... '%(roachIP)),
+    sys.stdout.flush()
+    fpga = corr.katcp_wrapper.FpgaClient(roachIP, logger = logger)
     time.sleep(1)
+    if not fpga.is_connected():
+      raise Exception('ERROR: Connection to TCPBorph server not successful.')
+    print 'done.'
+    print '    Configuring FPGA...',
+    sys.stdout.flush()
+    try:
+      with open('/home/nfs/roach2/current/boffiles/%s'%defs.QDR_TST_BOF) as f: pass
+    except:
+      inpath = 'support_files/%s'%defs.QDR_TST_BOF
+      outpath = '/home/nfs/roach2/current/boffiles/%s'%defs.QDR_TST_BOF
+      shutil.copyfile(inpath, outpath)
+      os.chmod(outpath, 0777)
+    try:
+      teln = telnetlib.Telnet(ip_addr, 7147)
+    except:
+      raise
+    teln.write('?progdev %s\n'%defs.QDR_TST_BOF)
+    timeout = 0
+    found = False
+    response = ''
+    while not found and timeout < 10:
+      time.sleep(1)
+      timeout += 1
+      response = response + teln.read_very_eager()
+      if response.find('!progdev ok') <> -1:
+        found = True
+    if not found:
+      teln.close()
+      raise Exception('ERROR: Boffile not programmed. Error message:\n%s'%response)
+    print 'boffile programmed.'
+    teln.close()
+    sys.stdout.flush()
 
-    if fpga.is_connected():
-        print 'ok\n'
-    else:
-        print 'ERROR connecting to server %s.\n'%(roach)
-        exit_fail()
-    
-#     if opts.bof != '':
-#         print '------------------------'
-#         print 'Configuring FPGA...',
-#         sys.stdout.flush()
-#         fpga.progdev(boffile)
-#        time.sleep(5)
-#         print 'ok'
-#     else:
-#         print '------------------------------'
-#         print 'No programming file specified!'  
-#         print 'Skipping FPGA Configuration...'
-#         print '------------------------------'
- 
     print '---------------------------------'
     print ' Checking QDR Calibration Status '  
     print '---------------------------------'
