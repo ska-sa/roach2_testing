@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os, sys, time, select, termios, tty, ftdi, subprocess, serial, logging, shutil, telnetlib
+import os, sys, time, select, termios, tty, ftdi, subprocess, serial, logging, telnetlib
 from optparse import OptionParser
 from mpsse import *
 import i2c_functions as iicf
