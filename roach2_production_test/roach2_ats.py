@@ -620,7 +620,6 @@ def check_ppc_i2c():
   try:
     i2c_avbl = False
     if find_str_ser(serial_obj, 'DRAM:', 10, False)[0]:
-      print 'DRAM found'
       if find_str_ser(serial_obj, 'stop autoboot:', defs.UBOOT_DELAY*10, False)[0]:
         serial_obj.write('\n')
         i2c_avbl = True
@@ -1199,9 +1198,6 @@ if __name__ == "__main__":
           load_urj('support_files/program_cpld.urj')
           press_pb('off')
           press_pb('on')
-          if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)[0]:
-            raise Exception('FATAL: U-Boot did not boot after reset.')
-          ser.write('\n')
           print '    Dumping CPLD mapped memory to confirm CPLD configuration.'  
           ser.write('md 0xc0000000 8\n')
           out = print_outp_ser(ser, 1)
