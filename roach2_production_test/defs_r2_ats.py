@@ -164,11 +164,9 @@ CONFIG_G_BOOT = [0x87, 0x78, 0x52, 0x4e, 0x0d, 0x57, 0xa0, 0x30, 0x40, 0x08, 0x2
 BSDL_PATH = 'support_files/bsdl'
 
 #U-boot path
-#UBOOT_REV1 = '/home/nfs/roach2/boot/u-boot-r2-rev1.bin'
-UBOOT_REV1 = '/home/alec/u-boot-nofpu.bin'
+UBOOT_REV1 = '/home/nfs/roach2/boot/u-boot-r2-rev1-nofpu.bin'
 UBOOT_REV1_MEMTEST = '/home/nfs/roach2/boot/u-boot-memtest-r2-rev1.bin'
-#UBOOT_REV2 = '/home/nfs/roach2/boot/u-boot-r2-rev2.bin'
-UBOOT_REV2 = '/home/alec/u-boot-gpio.bin'
+UBOOT_REV2 = '/home/nfs/roach2/boot/u-boot-r2-rev2.bin'
 UBOOT_REV2_MEMTEST = '/home/nfs/roach2/boot/u-boot-memtest-r2-rev2.bin'
 
 #QDR test boffile

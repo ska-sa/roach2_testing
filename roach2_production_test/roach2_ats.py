@@ -574,7 +574,7 @@ def open_ftdi_uart(port, baud, timeout = 1):
     raise
 
 def find_str_ser(serial_obj, string, timeout, display = True):
-  #serial_obj.flushOutput()
+  serial_obj.flushOutput()
   tout = 0
   srch = -1
   buff = '' 
@@ -619,7 +619,8 @@ def check_ppc_i2c():
     raise
   try:
     i2c_avbl = False
-    if find_str_ser(serial_obj, 'DRAM:', 4, False)[0]:
+    if find_str_ser(serial_obj, 'DRAM:', 10, False)[0]:
+      print 'DRAM found'
       if find_str_ser(serial_obj, 'stop autoboot:', defs.UBOOT_DELAY*10, False)[0]:
         serial_obj.write('\n')
         i2c_avbl = True
@@ -660,6 +661,7 @@ def press_pb(request):
       print '    Board is currently %s' %request
     else:
       print '    Switching board %s.' %find_key(pb_dic, not(curr_state))
+      sys.stdout.flush()
       res = ftdi.ftdi_set_bitmode(f, 0x40, ftdi.BITMODE_BITBANG)
       if res <> 0:
         raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
@@ -703,9 +705,6 @@ def get_assigned_ip(ser_obj):
     print 'Linux not booted, cycling power and net booting.'
     press_pb('off')
     press_pb('on')
-    if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
-      raise Exception('FATAL: U-Boot did not boot after reset.')
-    ser.write('\n')
     ser_obj.write('run netboot\n')
     print '    Waiting for Linux to net boot, this may take a minute...',
     sys.stdout.flush()
@@ -1159,9 +1158,6 @@ if __name__ == "__main__":
             if load_kernel:
               press_pb('off')
               press_pb('on')
-              if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)[0]:
-                raise Exception('FATAL: U-Boot did not boot after reset.')
-              ser.write('\n')
             ser.write('run tftpkernel\n')
             if not find_str_ser(ser, 'Waiting for PHY', 1)[0]:
               raise Exception('ERROR: U-Boot not loaded, load U-Boot before loading kernel.')
@@ -1174,9 +1170,6 @@ if __name__ == "__main__":
             if load_root:
               press_pb('off')
               press_pb('on')
-              if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)[0]:
-                raise Exception('FATAL: U-Boot did not boot after reset.')
-              ser.write('\n')
             root_load = False
             ser.write('run tftproot\n')
             if not find_str_ser(ser, 'ENET Speed is', 1)[0]:
