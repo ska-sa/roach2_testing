@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os, sys, time, select, termios, tty, ftdi, subprocess, serial, logging, telnetlib
+import os, sys, time, select, termios, tty, ftdi, subprocess, serial, logging, telnetlib, shutil
 from optparse import OptionParser
 from mpsse import *
 import i2c_functions as iicf
@@ -374,10 +374,25 @@ def open_ftdi_d():
   res = ftdi.ftdi_set_interface(f, ftdi.INTERFACE_D)
   if res <> 0:
     raise Exception('FTDI Interface ERROR: %s' %ftdi_int_err[res])
-  ftdi.ftdi_usb_open(f, defs.R2_VID, defs.R2_PID)
+  res = ftdi.ftdi_usb_open(f, defs.R2_VID, defs.R2_PID)
   if res <> 0:
     raise Exception('FTDI Open ERROR: %s' %ftdi_open_err[res])
   return f
+
+def disable_ftdi_a():
+  f = ftdi.ftdi_context()
+  ftdi.ftdi_init(f)
+  res = ftdi.ftdi_set_interface(f, ftdi.INTERFACE_A)
+  if res <> 0:
+    raise Exception('FTDI Interface ERROR: %s' %ftdi_int_err[res])
+  res = ftdi.ftdi_usb_open(f, defs.R2_VID, defs.R2_PID)
+  if res <> 0:
+    raise Exception('FTDI Open ERROR: %s' %ftdi_open_err[res])
+  # Set all lins on interface A as inputs.
+  res = ftdi.ftdi_set_bitmode(f, 0x00, ftdi.BITMODE_BITBANG)
+  if res <> 0:
+    raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
+  ftdi.ftdi_usb_close(f)
 
 def open_ftdi_b():
   try:
@@ -681,26 +696,40 @@ def get_assigned_ip(ser_obj):
     linux_booted = True
   if linux_booted:
     ser_obj.write('\n\n')
-    ser_obj.write('ls /boffiles/%s'%defs.QDR_TST_BOF)
+    ser_obj.write('ls /boffiles/%s\n'%defs.QDR_TST_BOF)
     if find_str_ser(ser_obj, 'cannot access', 1, False)[0]:
       linux_booted = False
   if not linux_booted:
     print 'Linux not booted, cycling power and net booting.'
     press_pb('off')
     press_pb('on')
+    if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
+      raise Exception('FATAL: U-Boot did not boot after reset.')
+    ser.write('\n')
     ser_obj.write('run netboot\n')
     print '    Waiting for Linux to net boot, this may take a minute...',
     sys.stdout.flush()
-    if not find_str_ser(ser_obj, 'login:', defs.BOOT_DELAY , False)[0]:
+    if not find_str_ser(ser_obj, 'Linux/PowerPC load:', 10, False)[0]:
       raise Exception('ERROR: Linux did not boot correctly.')
+    print 'loading romfs...',
+    sys.stdout.flush()
+    if not find_str_ser(ser_obj, 'Sending DHCP requests', 10, False)[0]:
+      raise Exception('ERROR: Linux did not boot correctly.')
+    print 'getting IP...',
+    sys.stdout.flush()
+    if not find_str_ser(ser_obj, 'login:', 10, False)[0]:
+      raise Exception('ERROR: Linux did not boot correctly.')
+    print 'done.'
+    sys.stdout.flush()
+    print '    Checking that the boffile is present...',
     ser_obj.write('root\n')
     time.sleep(0.1)
     ser_obj.flushInput()
     ser_obj.flushOutput()
     ser_obj.write('\n\n')
-    ser_obj.write('ls /boffiles/%s'%defs.QDR_TST_BOF)
-    if find_str_ser(ser_obj, 'cannot access', 1, False)[0]:
-      raise Exception('ERROR: Boffile not found, check NFS directory.')
+    ser_obj.write('ls /boffiles/%s\n'%defs.QDR_TST_BOF)
+    if find_str_ser(ser_obj, 'cannot access', 1, True)[0]:
+      raise Exception('ERROR: Boffile not found, check NFS directory, or Linux not booted correctly.')
     print 'done.'
   else:
     print 'Linux booted.'
@@ -1130,6 +1159,9 @@ if __name__ == "__main__":
             if load_kernel:
               press_pb('off')
               press_pb('on')
+              if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)[0]:
+                raise Exception('FATAL: U-Boot did not boot after reset.')
+              ser.write('\n')
             ser.write('run tftpkernel\n')
             if not find_str_ser(ser, 'Waiting for PHY', 1)[0]:
               raise Exception('ERROR: U-Boot not loaded, load U-Boot before loading kernel.')
@@ -1142,6 +1174,9 @@ if __name__ == "__main__":
             if load_root:
               press_pb('off')
               press_pb('on')
+              if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)[0]:
+                raise Exception('FATAL: U-Boot did not boot after reset.')
+              ser.write('\n')
             root_load = False
             ser.write('run tftproot\n')
             if not find_str_ser(ser, 'ENET Speed is', 1)[0]:
@@ -1171,9 +1206,9 @@ if __name__ == "__main__":
           load_urj('support_files/program_cpld.urj')
           press_pb('off')
           press_pb('on')
+          if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)[0]:
+            raise Exception('FATAL: U-Boot did not boot after reset.')
           ser.write('\n')
-          if not find_str_ser(ser, '=>', 1, False)[0]:
-            raise Exception('ERROR: U-Boot did not load correctly after powerup.')
           print '    Dumping CPLD mapped memory to confirm CPLD configuration.'  
           ser.write('md 0xc0000000 8\n')
           out = print_outp_ser(ser, 1)
@@ -1194,6 +1229,13 @@ if __name__ == "__main__":
           qdr_ok = False
           ser.flushInput()
           ser.flushOutput()
+          try:
+            with open('/home/nfs/roach2/current/boffiles/%s'%defs.QDR_TST_BOF) as f: pass
+          except:
+            inpath = 'support_files/%s'%defs.QDR_TST_BOF
+            outpath = '/home/nfs/roach2/current/boffiles/%s'%defs.QDR_TST_BOF
+            shutil.copyfile(inpath, outpath)
+            os.chmod(outpath, 0777)
           ip_addr = get_assigned_ip(ser)
           qdr_ok = qdr_tst.test_qdr(ip_addr, defs.QDR_TST_BOF)
         finally:
@@ -1293,3 +1335,24 @@ if __name__ == "__main__":
       print ''
       print c.FAIL+ ("%s %s" %(exc_mess, exc_type)) + c.ENDC
       print_menu = True
+
+
+
+
+
+
+# Code to shorten the JTAG chain and disable FTDI JTAG to use a JTAG debugger.
+        #try: 
+        #  f = open_ftdi_d()
+        #  res = ftdi.ftdi_set_bitmode(f, 0x08, ftdi.BITMODE_BITBANG)
+        #  if res <> 0:
+        #   raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
+        #  res = ftdi_write(f, '\x08')   
+        #  if res <> 1:
+        #    raise Exception('ERROR: FTDI write error, code: %d' %res)
+        #finally:
+        #  ftdi.ftdi_usb_close(f)
+        #try:  
+        # disable_ftdi_a()
+        #xcept:
+        # raise

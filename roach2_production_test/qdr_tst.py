@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import corr, time, struct, sys, logging, socket, telnetlib, shutil, os
+import corr, time, struct, sys, logging, socket, telnetlib
 import construct
 
 
@@ -166,13 +166,6 @@ def test_qdr(roachIP, boffile, testDuration = 1, reportLen = 10, txrxsnapdump = 
       print 'done.'
       print '    Configuring FPGA...',
       sys.stdout.flush()
-      try:
-        with open('/home/nfs/roach2/current/boffiles/%s'%boffile) as f: pass
-      except:
-        inpath = 'support_files/%s'%boffile
-        outpath = '/home/nfs/roach2/current/boffiles/%s'%boffile
-        shutil.copyfile(inpath, outpath)
-        os.chmod(outpath, 0777)
       try:
         teln = telnetlib.Telnet(roachIP, 7147)
       except:
