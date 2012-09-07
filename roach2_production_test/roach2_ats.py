@@ -1316,7 +1316,7 @@ if __name__ == "__main__":
       elif 'q' in answer:
         quit =  True
     except RuntimeError as e: 
-      print c.FAIL + e + c.ENDC
+      print c.FAIL + '%s'%e + c.ENDC
       print_menu = True
     except:
       exc_type = sys.exc_info()[0]
