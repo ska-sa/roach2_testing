@@ -619,7 +619,7 @@ def check_ppc_i2c():
     raise
   try:
     i2c_avbl = False
-    if find_str_ser(serial_obj, 'DRAM:', 10, False)[0]:
+    if find_str_ser(serial_obj, 'DRAM:', 6, False)[0]:
       if find_str_ser(serial_obj, 'stop autoboot:', defs.UBOOT_DELAY*10, False)[0]:
         serial_obj.write('\n')
         i2c_avbl = True
