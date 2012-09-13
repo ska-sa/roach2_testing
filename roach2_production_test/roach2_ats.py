@@ -273,17 +273,20 @@ def getkey_block():
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
 
 def set_serial_number():
-  print "    Select manufacturer (default = Digicom):"
-  for i, v in enumerate(defs.MANUF):
-    print ("    %d) %s" %(i+1, v))
-  answer = getkey_block()
-  try:
-    ans = int(answer)
-    if ans in range(1, i+2):
-      manuf = defs.MANUF.values()[ans-1]
-    else:
+  if SEL_MANUF:
+    print "    Select manufacturer (default = Digicom):"
+    for i, v in enumerate(defs.MANUF):
+      print ("    %d) %s" %(i+1, v))
+    answer = getkey_block()
+    try:
+      ans = int(answer)
+      if ans in range(1, i+2):
+        manuf = defs.MANUF.values()[ans-1]
+      else:
+        manuf = defs.MANUF['Digicom']
+    except ValueError:
       manuf = defs.MANUF['Digicom']
-  except ValueError:
+  else:
     manuf = defs.MANUF['Digicom']
   done = False
   while not done:
@@ -750,6 +753,8 @@ if __name__ == "__main__":
   p = OptionParser()
   p.set_usage('roach2_ats.py revision')
   opts, args = p.parse_args(sys.argv[1:])
+  # If this option is false Digicom will be automatically selected as the manufacturer.
+  SEL_MANUF = False
   # There are many differences between ROACH2 Rev 1 and 2. Select which version to test here.
   if args == []:
     REV = 2
