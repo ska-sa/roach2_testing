@@ -1256,7 +1256,10 @@ if __name__ == "__main__":
           if not find_str_ser(ser, 'Bytes transferred', 10)[0]:
             raise Exception('DHCP request not successful.')
           time.sleep(0.5)
-          ser.write('tftp 100000 roach2_bsp.bin\n')
+          if REV == 1:
+            ser.write('tftp 100000 roach2_bsp_rev1.bin\n')
+          else:
+            ser.write('tftp 100000 roach2_bsp_rev2.bin\n')
           print_outp_ser(ser, 2)
           ser.write('r2smap 100000\n')
           print_outp_ser(ser, 2)
