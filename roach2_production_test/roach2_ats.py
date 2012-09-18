@@ -1024,6 +1024,7 @@ if __name__ == "__main__":
         print_vc = True
         print_menu = True
       elif '6' in answer:
+        press_pb('on')
         print c.OKBLUE + ('\n    Scanning JTAG chain.') + c.ENDC
         scan_jtag = False
         scan_jtag_chain()
