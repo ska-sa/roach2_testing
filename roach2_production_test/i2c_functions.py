@@ -2,6 +2,9 @@
 import time
 
 
+RETRY = 40
+BACKOFF = 0.5
+
 def i2c_regwrite_raw(device, i2c_address, register, data):
   """Write register on I2C bus.
 
@@ -34,7 +37,7 @@ def i2c_regwrite_raw(device, i2c_address, register, data):
     raise RuntimeError("Failed to ack data.")
   return "Success" 
 
-def i2c_regwrite(device, i2c_address, register, data, retry = 2, backoff = 1):
+def i2c_regwrite(device, i2c_address, register, data, retry = RETRY, backoff = BACKOFF):
   """Write register on I2C bus.
 
   Keyword arguments:
@@ -91,7 +94,7 @@ def i2c_regread_raw(device, i2c_address, register):
     raise RuntimeError("Failed to ack read address.")
   return ord(rd_byte)
 
-def i2c_regread(device, i2c_address, register, retry = 2, backoff = 1):
+def i2c_regread(device, i2c_address, register, retry = RETRY, backoff = BACKOFF):
   """Read register on I2C bus.
 
   Keyword arguments:
@@ -150,7 +153,7 @@ def i2c_regread2b_raw(device, i2c_address, register):
     raise RuntimeError("Failed to ack read address.")
   return (ord(rd_byte1), ord(rd_byte2))
   
-def i2c_regread2b(device, i2c_address, register, retry = 2, backoff = 1):
+def i2c_regread2b(device, i2c_address, register, retry = RETRY, backoff = BACKOFF):
   """Read register on I2C bus.
 
   Keyword arguments:

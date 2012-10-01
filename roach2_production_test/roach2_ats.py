@@ -1258,7 +1258,7 @@ if __name__ == "__main__":
             raise Exception('DHCP request not successful.')
           time.sleep(0.5)
           if REV == 1:
-            ser.write('tftp 100000 roach2_bsp_rev1.bin\n')
+            ser.write('tftp 100000 roach2_bsp_rev2.bin\n')
           else:
             ser.write('tftp 100000 roach2_bsp_rev2.bin\n')
           print_outp_ser(ser, 2)
