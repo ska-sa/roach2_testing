@@ -616,6 +616,7 @@ def print_outp_ser(serial_obj, timeout):
 # This method opens a serial port object, if the serial port is already open that object wont be affected.
 # Note that the delays are multiplied by 10 as the serial port timeout is set to 0.1s
 def check_ppc_i2c():
+  return True
   try:
     serial_obj = open_ftdi_uart(ser_port, baud, 0.1)
   except:
@@ -653,38 +654,55 @@ def check_ppc_i2c():
     serial_obj.flushOutput()
     serial_obj.close()
 
-def press_pb(request):
+def press_pb_event(request):
   try:
     f = open_ftdi_d()
   except:
     raise
   try:
-    pb_dic = {'on' : 1, 'off' : 0}
-    curr_state = read_vmon_gpio('ATX_PWR_OK')
-    if curr_state == pb_dic[request]:
-      print '    Board is currently %s' %request
-    else:
-      print '    Switching board %s.' %find_key(pb_dic, not(curr_state))
-      sys.stdout.flush()
-      res = ftdi.ftdi_set_bitmode(f, 0x40, ftdi.BITMODE_BITBANG)
-      if res <> 0:
-        raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
-      if ftdi_write(f, '\x40') <> 1:
-        raise Exception('ERROR: FTDI write error, code: %d' %res)
-      # poll ATX_PWR_OK until board state changes, timeout = 7 x 0.5 seconds
-      new_state = curr_state
-      tout = 0
-      while (new_state == curr_state) and (tout < 7):
-        new_state = read_vmon_gpio('ATX_PWR_OK')
-        time.sleep(0.5)
-        tout = tout + 1
-      if ftdi_write(f, '\x00') <> 1:
-        raise Exception('ERROR: FTDI write error, code: %d' %res)
-      # More than 4 seconds elapsed, board should have switched state by now.
-      if tout >= 7:
-        raise Exception, ('Power button did not have an effect.')
+      result = False
+      pb_dic = {'on' : 1, 'off' : 0}
+      curr_state = read_vmon_gpio('ATX_PWR_OK')
+      if curr_state == pb_dic[request]:
+        print '    Board is currently %s' %request
+        result = True
+      else:
+        print '    Switching board %s.' %find_key(pb_dic, not(curr_state))
+        sys.stdout.flush()
+        res = ftdi.ftdi_set_bitmode(f, 0x40, ftdi.BITMODE_BITBANG)
+        if res <> 0:
+          raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
+        if ftdi_write(f, '\x40') <> 1:
+          raise Exception('ERROR: FTDI write error, code: %d' %res)
+        # poll ATX_PWR_OK until board state changes, timeout = 7 x 0.5 seconds
+        new_state = curr_state
+        tout = 0
+        while (new_state == curr_state) and (tout < 7):
+          new_state = read_vmon_gpio('ATX_PWR_OK')
+          time.sleep(0.5)
+          tout = tout + 1
+        if ftdi_write(f, '\x00') <> 1:
+          raise Exception('ERROR: FTDI write error, code: %d' %res)
+        # More than 4 seconds elapsed, board should have switched state by now.
+        if tout >= 7:
+          result = False
+        else:
+          result = True
+      return result
   finally:
     ftdi.ftdi_usb_close(f)
+
+def press_pb(request):
+  retry = 3
+  count = 0
+  success = False
+  while count < retry and not success:
+    success = press_pb_event(request)
+    if not success:
+      time.sleep(1)
+    count += 1
+  if not success:
+    raise Exception, ('Power button did not have an effect.')
 
 def get_assigned_ip(ser_obj):
   print '    Checking PPC state...',

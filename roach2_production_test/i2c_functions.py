@@ -51,18 +51,19 @@ def i2c_regwrite(device, i2c_address, register, data, retry = RETRY, backoff = B
   """
   count = 0
   success = False
-  while count < retry:
+  while (count < retry) and not success:
     try:
       result = i2c_regwrite_raw(device, i2c_address, register, data)
       success = True
-      count = retry + 1
     except RuntimeError as e:
-      print '\nI2C write error: %s' %e
+      #print '\nI2C write error: %s' %e
       time.sleep(backoff)
       count = count + 1
   if not success:
     raise RuntimeError('Error: I2C write failed.') 
   else:
+    if count > 1:
+      print '\nINFO: I2C transaction took %d tries to complete.'%count 
     return result
 
 def i2c_regread_raw(device, i2c_address, register):
@@ -107,18 +108,19 @@ def i2c_regread(device, i2c_address, register, retry = RETRY, backoff = BACKOFF)
   """
   count = 0
   success = False
-  while count < retry:
+  while (count < retry) and not success:
     try:
       rd_byte = i2c_regread_raw(device, i2c_address, register)
       success = True
-      count = retry + 1
     except RuntimeError as e:
-      print '\nI2C read error: %s' %e
+      #print '\nI2C read error: %s' %e
       time.sleep(backoff)
       count = count + 1
   if not success:
     raise RuntimeError('Error: I2C read failed.') 
   else:
+    if count > 1:
+      print '\nINFO: I2C transaction took %d tries to complete.'%count 
     return rd_byte
   
 def i2c_regread2b_raw(device, i2c_address, register):
@@ -167,18 +169,19 @@ def i2c_regread2b(device, i2c_address, register, retry = RETRY, backoff = BACKOF
   """
   count = 0
   success = False
-  while count < retry:
+  while (count < retry) and not success:
     try:
       rd_byte = i2c_regread2b_raw(device, i2c_address, register)
       success = True
-      count = retry + 1
     except RuntimeError as e:
-      print '\nI2C read error: %s' %e
+      #print '\nI2C read error: %s' %e
       time.sleep(backoff)
       count = count + 1
   if not success:
     raise RuntimeError('Error: I2C read failed.') 
   else:
+    if count > 1:
+      print '\nINFO: I2C transaction took %d tries to complete.'%count 
     return rd_byte
 
 # I2C addresses on ROACH2 bus
