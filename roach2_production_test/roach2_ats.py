@@ -692,6 +692,7 @@ def press_pb_event(request):
   finally:
     ftdi.ftdi_usb_close(f)
 
+#It would seem on some early boards the FTDI command does not go through, this function retries 3 times.
 def press_pb(request):
   retry = 3
   count = 0
@@ -1224,6 +1225,10 @@ if __name__ == "__main__":
           load_urj('support_files/program_cpld.urj')
           press_pb('off')
           press_pb('on')
+          if find_str_ser(serial_obj, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
+            ser.write('\n')
+          else:
+            raise Exception('ERROR: U-Boot did not load correctly.')
           print '    Dumping CPLD mapped memory to confirm CPLD configuration.'  
           ser.write('md 0xc0000000 8\n')
           out = print_outp_ser(ser, 1)
@@ -1268,9 +1273,10 @@ if __name__ == "__main__":
           print c.OKBLUE + '\n    Running preliminary DDR3, ZDOK, TGE and 1GE tests.' + c.ENDC
           press_pb('off')
           press_pb('on')
-          ser.write('\n')
-          if not find_str_ser(ser, '=>', 1, False)[0]:
-            raise Exception('ERROR: U-Boot did not load correctly after powerup.')
+          if find_str_ser(serial_obj, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
+            ser.write('\n')
+          else:
+            raise Exception('ERROR: U-Boot did not load correctly.')
           ser.write('dhcp\n')
           if not find_str_ser(ser, 'Bytes transferred', 10)[0]:
             raise Exception('DHCP request not successful.')
