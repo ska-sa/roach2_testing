@@ -1225,7 +1225,7 @@ if __name__ == "__main__":
           load_urj('support_files/program_cpld.urj')
           press_pb('off')
           press_pb('on')
-          if find_str_ser(serial_obj, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
+          if find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
             ser.write('\n')
           else:
             raise Exception('ERROR: U-Boot did not load correctly.')
@@ -1273,7 +1273,7 @@ if __name__ == "__main__":
           print c.OKBLUE + '\n    Running preliminary DDR3, ZDOK, TGE and 1GE tests.' + c.ENDC
           press_pb('off')
           press_pb('on')
-          if find_str_ser(serial_obj, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
+          if find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
             ser.write('\n')
           else:
             raise Exception('ERROR: U-Boot did not load correctly.')
