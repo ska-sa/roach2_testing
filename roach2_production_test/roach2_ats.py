@@ -728,6 +728,10 @@ def get_assigned_ip(ser_obj):
     print 'Linux not booted, cycling power and net booting.'
     press_pb('off')
     press_pb('on')
+    if find_str_ser(ser_obj, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
+      ser_obj.write('\n')
+    else:
+      raise Exception('ERROR: U-Boot did not load correctly.')
     ser_obj.write('run netboot\n')
     print '    Waiting for Linux to net boot, this may take a minute...',
     sys.stdout.flush()
@@ -1184,6 +1188,10 @@ if __name__ == "__main__":
             if load_kernel:
               press_pb('off')
               press_pb('on')
+              if find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
+                ser.write('\n')
+              else:
+                raise Exception('ERROR: U-Boot did not load correctly.')
             ser.write('run tftpkernel\n')
             if not find_str_ser(ser, 'Waiting for PHY', 1)[0]:
               raise Exception('ERROR: U-Boot not loaded, load U-Boot before loading kernel.')
@@ -1196,6 +1204,10 @@ if __name__ == "__main__":
             if load_root:
               press_pb('off')
               press_pb('on')
+              if find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
+                ser.write('\n')
+              else:
+                raise Exception('ERROR: U-Boot did not load correctly.')
             root_load = False
             ser.write('run tftproot\n')
             if not find_str_ser(ser, 'ENET Speed is', 1)[0]:
@@ -1282,7 +1294,7 @@ if __name__ == "__main__":
             raise Exception('DHCP request not successful.')
           time.sleep(0.5)
           if REV == 1:
-            ser.write('tftp 100000 roach2_bsp_rev2.bin\n')
+            ser.write('tftp 100000 roach2_bsp_rev1.bin\n')
           else:
             ser.write('tftp 100000 roach2_bsp_rev2.bin\n')
           print_outp_ser(ser, 2)
@@ -1313,6 +1325,10 @@ if __name__ == "__main__":
           test_usb = False
           press_pb('off')
           press_pb('on')
+          if find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
+            ser.write('\n')
+          else:
+            raise Exception('ERROR: U-Boot did not load correctly.')
           # Scan the USB bus 5 times, u-boot sometimes takes a while to detect the USB drive
           retry = 0
           while not find_str_ser(ser, '1 Storage Device(s) found', 3)[0]:
