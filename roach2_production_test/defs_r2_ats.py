@@ -92,7 +92,7 @@ UC_C_THRESHOLD = {
 }
 
 # Voltage thresholds, mods for rev1: 3V3_AUX is 12V and 12V = 0
-TOL_V = 0.04
+TOL_V = 0.1
 DIV = defs_max16071.V_DIV_12V
 V_THRESHOLD_REV1 = {
   '5V0_H'     : 5.0 + 5.0*TOL_V,

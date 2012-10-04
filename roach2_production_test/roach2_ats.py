@@ -1236,18 +1236,22 @@ if __name__ == "__main__":
           print '    Programming CPLD...',
           load_urj('support_files/program_cpld.urj')
           press_pb('off')
+          ser.flushInput()
+          ser.flushOutput()
           press_pb('on')
           if find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
             ser.write('\n')
           else:
             raise Exception('ERROR: U-Boot did not load correctly.')
           print '    Dumping CPLD mapped memory to confirm CPLD configuration.'  
+          time.sleep(1)
           ser.write('md 0xc0000000 8\n')
           out = print_outp_ser(ser, 1)
           print ''
           if out.find(defs.CPLD_MD) == -1:
             raise Exception, ('FATAL: CPLD did not program correctly.')
           cpld_done = True
+          print c.OKBLUE + ('\n\n    CPLD successfully programmed.') + c.ENDC
         finally:
           ser.close()
           print_menu = True
