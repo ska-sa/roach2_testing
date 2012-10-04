@@ -732,6 +732,7 @@ def get_assigned_ip(ser_obj):
       ser_obj.write('\n')
     else:
       raise Exception('ERROR: U-Boot did not load correctly.')
+    time.sleep(1)
     ser_obj.write('run netboot\n')
     print '    Waiting for Linux to net boot, this may take a minute...',
     sys.stdout.flush()
@@ -1174,12 +1175,14 @@ if __name__ == "__main__":
             if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)[0]:
               raise  Exception('FATAL: U-Boot did not boot after x-modem transfer.')
             ser.write('\n')
+            time.sleep(1)
             ser.write('run clearenv\n')
             print_outp_ser(ser, 1)
             ser.write('reset\n')
             if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)[0]:
               raise Exception('FATAL: U-Boot did not boot after reset.')
             ser.write('\n')
+            time.sleep(1)
             ser.write('saveenv\n')
             print_outp_ser(ser, 1)
             uboot_load = True
@@ -1192,8 +1195,9 @@ if __name__ == "__main__":
                 ser.write('\n')
               else:
                 raise Exception('ERROR: U-Boot did not load correctly.')
+            time.sleep(1)
             ser.write('run tftpkernel\n')
-            if not find_str_ser(ser, 'Waiting for PHY', 1)[0]:
+            if not find_str_ser(ser, 'Waiting for PHY', 2)[0]:
               raise Exception('ERROR: U-Boot not loaded, load U-Boot before loading kernel.')
             if not find_str_ser(ser, 'DHCP client bound to address', 60)[0]:
               raise Exception('ERROR: IP address not assigned, check connections and DHCP server.')
@@ -1209,8 +1213,9 @@ if __name__ == "__main__":
               else:
                 raise Exception('ERROR: U-Boot did not load correctly.')
             root_load = False
+            time.sleep(1)
             ser.write('run tftproot\n')
-            if not find_str_ser(ser, 'ENET Speed is', 1)[0]:
+            if not find_str_ser(ser, 'ENET Speed is', 3)[0]:
               raise Exception('ERROR: U-Boot not loaded, load U-Boot before loading root file system.')
             if not find_str_ser(ser, 'DHCP client bound to address', 60)[0]:
               raise Exception('ERROR: IP address not assigned, check connections and DHCP server.')
@@ -1262,6 +1267,7 @@ if __name__ == "__main__":
           raise
         try:
           print c.OKBLUE + '\n    Testing QDR memory.' + c.ENDC
+          press_pb('off')
           qdr_ok = False
           ser.flushInput()
           ser.flushOutput()
@@ -1293,6 +1299,7 @@ if __name__ == "__main__":
             ser.write('\n')
           else:
             raise Exception('ERROR: U-Boot did not load correctly.')
+          time.sleep(1)
           ser.write('dhcp\n')
           if not find_str_ser(ser, 'Bytes transferred', 10)[0]:
             raise Exception('DHCP request not successful.')
@@ -1333,6 +1340,7 @@ if __name__ == "__main__":
             ser.write('\n')
           else:
             raise Exception('ERROR: U-Boot did not load correctly.')
+          time.sleep(1)
           # Scan the USB bus 5 times, u-boot sometimes takes a while to detect the USB drive
           retry = 0
           while not find_str_ser(ser, '1 Storage Device(s) found', 3)[0]:
