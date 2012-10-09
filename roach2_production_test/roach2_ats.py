@@ -1120,7 +1120,8 @@ if __name__ == "__main__":
             xio = xtx.Xmodem_tx(ser, defs.UBOOT_REV2_MEMTEST, fh)
           print '    Loading DDR2 checking program via JTAG, this will take while...'
           load_ppc('support_files/program.mac')
-          print '    Sending U-Boot via Xmodem.'
+          print '    Sending U-Boot via Xmodem.'   
+          sys.std_out.flush()
           if not xio.xmdm_send():
             raise Exception('FATAL: U-Boot Xmodem transfer not successfull.')
           if not find_str_ser(ser, 'SDRAM test passes', 1)[0]:
