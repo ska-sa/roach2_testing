@@ -705,6 +705,13 @@ def press_pb(request):
   if not success:
     raise Exception, ('Power button did not have an effect.')
 
+def xmodem_trans(file_to_send, log_fh):
+  xio = xtx.Xmodem_tx(ser, file_to_send, log_fh)
+  load_ppc('support_files/program.mac')
+  print '    Sending U-Boot via Xmodem.'   
+  sys.std_out.flush()
+  return xio.xmdm_send()
+
 def get_assigned_ip(ser_obj):
   print '    Checking PPC state...',
   ser_obj.write('\n')
@@ -1114,15 +1121,20 @@ if __name__ == "__main__":
           if not find_str_ser(ser, 'pass', 3)[0]:
             raise Exception, ('FATAL: FLASH memory test failed.')
           print c.OKBLUE + ('\n\n    FLASH memory test passed.\n') + c.ENDC
-          if REV == 1:
-            xio = xtx.Xmodem_tx(ser, defs.UBOOT_REV1_MEMTEST, fh)
-          else:
-            xio = xtx.Xmodem_tx(ser, defs.UBOOT_REV2_MEMTEST, fh)
           print '    Loading DDR2 checking program via JTAG, this will take while...'
-          load_ppc('support_files/program.mac')
-          print '    Sending U-Boot via Xmodem.'   
-          sys.std_out.flush()
-          if not xio.xmdm_send():
+          if REV == 1:
+            file_to_send = defs.UBOOT_REV1_MEMTEST
+          else:
+            file_to_send = defs.UBOOT_REV2_MEMTEST
+          num_retry = 3
+          retry = 0
+          sent = False
+          while retry < num_retry and not sent:
+            if retry > 0:
+              print'INFO: XModem transfer failed... retrying.'
+            retry += 1
+            sent = xmodem_trans(file_to_send, fh)
+          if not sent:
             raise Exception('FATAL: U-Boot Xmodem transfer not successfull.')
           if not find_str_ser(ser, 'SDRAM test passes', 1)[0]:
             raise  Exception('FATAL: PPC DDR2 memory test failed.')
@@ -1162,16 +1174,20 @@ if __name__ == "__main__":
             uoot_load = False
             press_pb('off')
             press_pb('on')
-            if REV == 1:
-              xio = xtx.Xmodem_tx(ser, defs.UBOOT_REV1, fh)
-            else:
-              xio = xtx.Xmodem_tx(ser, defs.UBOOT_REV2, fh)
             print '    Loading rinit (PPC Xmodem receiver program) via JTAG, this will take while...'
-            load_ppc('support_files/program.mac')
-            start_time = time.time()
-            print '    Sending U-Boot via Xmodem.'
-            if not xio.xmdm_send():
-              print 'Elapsed: %f' %(time.time() - start_time)
+            if REV == 1:
+              file_to_send = defs.UBOOT_REV1
+            else:
+              file_to_send = defs.UBOOT_REV2
+            num_retry = 3
+            retry = 0
+            sent = False
+            while retry < num_retry and not sent:
+              if retry > 0:
+                print'INFO: XModem transfer failed... retrying.'
+              retry += 1
+              sent = xmodem_trans(file_to_send, fh)
+            if not sent:
               raise Exception('FATAL: U-Boot Xmodem transfer not successfull.')
             if not find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY)[0]:
               raise  Exception('FATAL: U-Boot did not boot after x-modem transfer.')
