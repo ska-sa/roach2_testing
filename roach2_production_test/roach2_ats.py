@@ -709,7 +709,7 @@ def xmodem_trans(file_to_send, log_fh):
   xio = xtx.Xmodem_tx(ser, file_to_send, log_fh)
   load_ppc('support_files/program.mac')
   print '    Sending U-Boot via Xmodem.'   
-  sys.std_out.flush()
+  sys.stdout.flush()
   return xio.xmdm_send()
 
 def get_assigned_ip(ser_obj):
