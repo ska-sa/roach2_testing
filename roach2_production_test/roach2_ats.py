@@ -1126,7 +1126,7 @@ if __name__ == "__main__":
             file_to_send = defs.UBOOT_REV1_MEMTEST
           else:
             file_to_send = defs.UBOOT_REV2_MEMTEST
-          num_retry = 3
+          num_retry = 5
           retry = 0
           sent = False
           while retry < num_retry and not sent:
