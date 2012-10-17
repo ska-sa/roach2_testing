@@ -1130,6 +1130,8 @@ if __name__ == "__main__":
           retry = 0
           sent = False
           while retry < num_retry and not sent:
+            ser.flushInput()
+            ser.flushOutput()
             if retry > 0:
               print'INFO: XModem transfer failed... retrying.'
             retry += 1
@@ -1179,10 +1181,12 @@ if __name__ == "__main__":
               file_to_send = defs.UBOOT_REV1
             else:
               file_to_send = defs.UBOOT_REV2
-            num_retry = 3
+            num_retry = 5
             retry = 0
             sent = False
             while retry < num_retry and not sent:
+              ser.flushInput()
+              ser.flushOutput()
               if retry > 0:
                 print'INFO: XModem transfer failed... retrying.'
               retry += 1
