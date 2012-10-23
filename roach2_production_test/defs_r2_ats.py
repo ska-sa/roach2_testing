@@ -169,9 +169,9 @@ UBOOT_REV1_MEMTEST = '/home/nfs/roach2/boot/u-boot-memtest-r2-rev1.bin'
 UBOOT_REV2 = '/home/nfs/roach2/boot/u-boot-r2-rev2.bin'
 UBOOT_REV2_MEMTEST = '/home/nfs/roach2/boot/u-boot-memtest-r2-rev2.bin'
 
-#QDR test boffile
+#boffiles
 QDR_TST_BOF = 'qdr_tst_r2_2x_2012_May_07_1216.bof'
-
+SFP_PLUS_BOF = 'r2_trans_test_2012_Oct_19_0911.bof'
 # Set xilinx source path
 XILINX_SRC_PATH = '/opt/Xilinx/12.4/LabTools/settings64.sh'
 

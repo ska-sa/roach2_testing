@@ -712,7 +712,7 @@ def xmodem_trans(file_to_send, log_fh):
   sys.stdout.flush()
   return xio.xmdm_send()
 
-def get_assigned_ip(ser_obj):
+def get_assigned_ip(ser_obj, bof_file):
   print '    Checking PPC state...',
   ser_obj.write('\n')
   #Determine if boffile is present to see if system already netbooted.
@@ -728,7 +728,7 @@ def get_assigned_ip(ser_obj):
     linux_booted = True
   if linux_booted:
     ser_obj.write('\n\n')
-    ser_obj.write('ls /boffiles/%s\n'%defs.QDR_TST_BOF)
+    ser_obj.write('ls /boffiles/%s\n'%bof_file)
     if find_str_ser(ser_obj, 'cannot access', 1, False)[0]:
       linux_booted = False
   if not linux_booted:
@@ -761,7 +761,7 @@ def get_assigned_ip(ser_obj):
     ser_obj.flushInput()
     ser_obj.flushOutput()
     ser_obj.write('\n\n')
-    ser_obj.write('ls /boffiles/%s\n'%defs.QDR_TST_BOF)
+    ser_obj.write('ls /boffiles/%s\n'%defs.bof_file)
     if find_str_ser(ser_obj, 'cannot access', 1, True)[0]:
       raise Exception('ERROR: Boffile not found, check NFS directory, or Linux not booted correctly.')
     print 'done.'
@@ -854,6 +854,7 @@ if __name__ == "__main__":
     'e':c.ENDC,
     'r':c.ENDC,
     't':c.ENDC,
+    'y':c.ENDC,
     'q':c.ENDC,
     'm':c.ENDC
   }
@@ -874,6 +875,7 @@ if __name__ == "__main__":
   root_load = False
   cpld_done = False
   qdr_ok = False
+  sfp_ok = False
   test_usb = False
   uboot_rem = False
   quit = False
@@ -926,6 +928,7 @@ if __name__ == "__main__":
         root_load = False
         cpld_done = False
         qdr_ok = False
+        sfp_ok = False
         test_usb = False
         uboot_rem = False
         print_menu = True
@@ -967,6 +970,8 @@ if __name__ == "__main__":
         col['e'] = c.OKGREEN
       if test_usb:
         col['t'] = c.OKGREEN
+      if sfp_ok:
+        col['y'] = c.OKGREEN
       
       if print_menu:
         manuf_id = sn['manufacturer']
@@ -994,6 +999,7 @@ if __name__ == "__main__":
         print col['e'] + '    e) Test QDR memory' + c.ENDC
         print col['r'] + '    r) Run preliminary DDR3, ZDOK, TGE, 1GE tests' + c.ENDC
         print col['t'] + '    t) Test PPC USB host' + c.ENDC
+        print col['y'] + '    y) Test SFP+ Cards' + c.ENDC
         print col['m'] + '    m) Unload U-Boot (if U-Boot does not start correctly and holds the I2C bus).' + c.ENDC
         print col['q'] + '    q) Quit' + c.ENDC
       answer = getkey()
@@ -1299,7 +1305,7 @@ if __name__ == "__main__":
             outpath = '/home/nfs/roach2/current/boffiles/%s'%defs.QDR_TST_BOF
             shutil.copyfile(inpath, outpath)
             os.chmod(outpath, 0777)
-          ip_addr = get_assigned_ip(ser)
+          ip_addr = get_assigned_ip(ser, defs.QDR_TST_BOF)
           qdr_ok = qdr_tst.test_qdr(ip_addr, defs.QDR_TST_BOF)
         finally:
           try: 
@@ -1383,6 +1389,32 @@ if __name__ == "__main__":
           print ''
           print 'USB host working correctly.'
           test_usb = True
+        finally:
+          ser.close()
+          print_menu = True
+      elif 'y' in answer:
+        try:
+          ser = open_ftdi_uart(ser_port, baud)
+        except:
+          raise
+        try:
+          print c.OKBLUE + '\n    Running SFP+ test.' + c.ENDC
+          press_pb('off')
+          sfp_ok = False
+          ser.flushInput()
+          ser.flushOutput()
+          try:
+            with open('/home/nfs/roach2/current/boffiles/%s'%defs.SFP_PLUS_BOF) as f: pass
+          except:
+            inpath = 'support_files/%s'%defs.SFP_PLUS_BOF
+            outpath = '/home/nfs/roach2/current/boffiles/%s'%defs.SFP_PLUS_BOF
+            shutil.copyfile(inpath, outpath)
+            os.chmod(outpath, 0777)
+          ip_addr = get_assigned_ip(ser, defs.SFP_PLUS_BOF)
+          sys.stdout.flush()
+          proc = subprocess.Popen(['trans_test', ip_addr, '-v', '-a'], stdout=subprocess.PIPE)
+          out = proc.communicate()[0]
+          print out
         finally:
           ser.close()
           print_menu = True
