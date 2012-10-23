@@ -9,6 +9,7 @@ import defs_max16071, defs_max1805, defs_ad7414
 import defs_r2_ats as defs
 from bcolours import bcolours as c
 import qdr_tst
+import trans_test
 import corr
 
 def config_mon():
@@ -761,7 +762,7 @@ def get_assigned_ip(ser_obj, bof_file):
     ser_obj.flushInput()
     ser_obj.flushOutput()
     ser_obj.write('\n\n')
-    ser_obj.write('ls /boffiles/%s\n'%defs.bof_file)
+    ser_obj.write('ls /boffiles/%s\n'%bof_file)
     if find_str_ser(ser_obj, 'cannot access', 1, True)[0]:
       raise Exception('ERROR: Boffile not found, check NFS directory, or Linux not booted correctly.')
     print 'done.'
@@ -1399,7 +1400,7 @@ if __name__ == "__main__":
           raise
         try:
           print c.OKBLUE + '\n    Running SFP+ test.' + c.ENDC
-          press_pb('off')
+          #press_pb('off')
           sfp_ok = False
           ser.flushInput()
           ser.flushOutput()
@@ -1411,10 +1412,7 @@ if __name__ == "__main__":
             shutil.copyfile(inpath, outpath)
             os.chmod(outpath, 0777)
           ip_addr = get_assigned_ip(ser, defs.SFP_PLUS_BOF)
-          sys.stdout.flush()
-          proc = subprocess.Popen(['trans_test', ip_addr, '-v', '-a'], stdout=subprocess.PIPE)
-          out = proc.communicate()[0]
-          print out
+          trans_test.trans_test(ip_addr, clk_chk = False, auto_test = True)
         finally:
           ser.close()
           print_menu = True
