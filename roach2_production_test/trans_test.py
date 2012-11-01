@@ -19,20 +19,6 @@ katcp_port=7147
 rate_n=2
 rate_d=2
 
-def exit_fail(lh):
-    print 'FAILURE DETECTED. Log entries:\n',lh.printMessages()
-    try:
-        fpga.stop()
-    except: pass
-    raise
-    exit()
-
-def exit_clean():
-    try:
-        fp.close()
-        fpga.stop()
-    except: pass
-    exit()
 
 def ByteToHex( byteStr ):
     """
@@ -63,7 +49,7 @@ def ip2str(pkt_ip, verbose = False):
 
 
 #START OF MAIN:
-def print_report():
+def print_report(connections, link, rx_cnt_ok, tx_cnt, rx_cnt_bad, rx_wrd_cnt_fail, error_rate, rx_wrd_cnt_missing):
     print "\n\n======================="
     print '\tREPORT'
     print "======================="
@@ -117,11 +103,12 @@ def trans_test(roach, desired_rate = 8.0, pkt_size = 1024, skip = False, debug =
         fpga = corr.katcp_wrapper.FpgaClient(roach, katcp_port, timeout=10,logger=logger)
         time.sleep(1)
 
+        conn_err = False
         if fpga.is_connected():
             print 'ok'
         else:
             print 'ERROR connecting to server %s on port %i.\n'%(roach,katcp_port)
-            exit_fail(lh)
+            conn_err = True
 
         connections=[float("-inf"),float("-inf"),float("inf"),float("inf"),float("-inf"),float("-inf"),float("-inf"),float("-inf")]
 
@@ -158,9 +145,9 @@ def trans_test(roach, desired_rate = 8.0, pkt_size = 1024, skip = False, debug =
                 fpga.tap_start(tap_dev=('gbe%i'%tx_n),device='gbe%i'%tx_n,mac=(20015998304256+tx_n),ip=(10<<24)+10+tx_n,port=10000)
             print 'done'
 
-            print "\tWaiting 10s for ARP to complete...",
+            print "\tWaiting 12s for ARP to complete...",
             sys.stdout.flush()
-            time.sleep(10)
+            time.sleep(20)
             print 'done'
 
         if debug:
@@ -389,18 +376,19 @@ def trans_test(roach, desired_rate = 8.0, pkt_size = 1024, skip = False, debug =
                     cont-=1
 
             if cont<=0: 
-                print_report()
+                print_report(connections, link, rx_cnt_ok, tx_cnt, rx_cnt_bad, rx_wrd_cnt_fail, error_rate, rx_wrd_cnt_missing)
+                return True
             else:
                 time.sleep(1)
 
     #TODO: output to log file
 
-
     except KeyboardInterrupt:
-        print_report()
-        exit_clean()
-    except:
-        exit_fail(lh)
-
-    exit_clean()
+        print_report(connections, link, rx_cnt_ok, tx_cnt, rx_cnt_bad, rx_wrd_cnt_fail, error_rate, rx_wrd_cnt_missing)
+        return True
+    finally:
+        try:
+            fp.close()
+            fpga.stop()
+        except: pass
 

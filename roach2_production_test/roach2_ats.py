@@ -1412,7 +1412,10 @@ if __name__ == "__main__":
             shutil.copyfile(inpath, outpath)
             os.chmod(outpath, 0777)
           ip_addr = get_assigned_ip(ser, defs.SFP_PLUS_BOF)
-          trans_test.trans_test(ip_addr, clk_chk = False, auto_test = True)
+          try:
+            sfp_ok = trans_test.trans_test(ip_addr, auto_test = True)
+          except:
+            raise
         finally:
           ser.close()
           print_menu = True
