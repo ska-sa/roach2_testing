@@ -159,6 +159,7 @@ def test_qdr(roachIP, boffile, logger, ser_num, calonly = False, numCalRuns = 10
   try:
       # create logger for all qdr test runs
       global_log = logging.getLogger('global_qdr_log')
+      global_log.setLevel(logging.DEBUG)
       global_fh = logging.FileHandler('log/qdr_test.log')
       global_fh.setLevel(logging.DEBUG)
       # create formatter and add it to the handlers

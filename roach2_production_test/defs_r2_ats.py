@@ -166,8 +166,7 @@ BSDL_PATH = 'support_files/bsdl'
 #U-boot path
 UBOOT_REV1 = '/home/nfs/roach2/boot/u-boot-r2-rev1.bin'
 UBOOT_REV1_MEMTEST = '/home/nfs/roach2/boot/u-boot-memtest-r2-rev1.bin'
-#UBOOT_REV2 = '/home/nfs/roach2/boot/u-boot-r2-rev2.bin'
-UBOOT_REV2 = '/home/nfs/roach2/boot/u-boot-hiz.bin'
+UBOOT_REV2 = '/home/nfs/roach2/boot/u-boot-r2-rev2.bin'
 UBOOT_REV2_MEMTEST = '/home/nfs/roach2/boot/u-boot-memtest-r2-rev2.bin'
 
 #array of boffiles to test calibration
