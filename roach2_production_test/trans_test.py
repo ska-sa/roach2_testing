@@ -4,7 +4,7 @@ Tests ROACH2 mezzanine transceivers using SFP+ boards.
 \nAuthor: Jason Manley, June 2012.
 '''
 
-import corr,time,numpy,struct,sys,logging,pylab,csv
+import corr,time,numpy,struct,sys,logging,csv
 from corr import termcolors
 
 #bitstream = 'r2_trans_test_2012_Jul_06_1249.bof'

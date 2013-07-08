@@ -166,11 +166,13 @@ BSDL_PATH = 'support_files/bsdl'
 #U-boot path
 UBOOT_REV1 = '/home/nfs/roach2/boot/u-boot-r2-rev1.bin'
 UBOOT_REV1_MEMTEST = '/home/nfs/roach2/boot/u-boot-memtest-r2-rev1.bin'
-UBOOT_REV2 = '/home/nfs/roach2/boot/u-boot-r2-rev2.bin'
+#UBOOT_REV2 = '/home/nfs/roach2/boot/u-boot-r2-rev2.bin'
+UBOOT_REV2 = '/home/nfs/roach2/boot/u-boot-hiz.bin'
 UBOOT_REV2_MEMTEST = '/home/nfs/roach2/boot/u-boot-memtest-r2-rev2.bin'
 
-#boffiles
-QDR_TST_BOF = 'qdr_tst_r2_2x_2012_May_07_1216.bof'
+#array of boffiles to test calibration
+QDR_TST_BOF = ['qdr_no_front_delay.bof.gz', 'qdr_tst_r2_2x_2013_Jul_05_0630_0_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_0926_1_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_1131_2_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_0956_3_otaps.bof.gz']
+#QDR_TST_BOF = 'r2_qdr_tst_r2_2x_2012_Oct_31_1248.bof'
 SFP_PLUS_BOF = 'r2_trans_test_2012_Oct_19_0911.bof'
 # Set xilinx source path
 XILINX_SRC_PATH = '/opt/Xilinx/12.4/LabTools/settings64.sh'
@@ -183,3 +185,4 @@ JTAG_SCAN_RENESAS ='Connected to libftdi driver.\nIR length: 64\nChain length: 1
 
 JTAG_SCAN_CYPRESS = 'Connected to libftdi driver.\nIR length: 64\nChain length: 11\nDevice Id: 00011000000000000110000110010111 (0x18006197)\n  Filename:     support_files/bsdl/MAX16071.BSD\nDevice Id: 00011000000000000110000110010111 (0x18006197)\n  Filename:     support_files/bsdl/MAX16071.BSD\nDevice Id: 00000000000000000000001111010011 (0x000003D3)\n  Filename:     support_files/bsdl/marvell_guess.bsd\nDevice Id: 00000000000000000000001111010011 (0x000003D3)\n  Filename:     support_files/bsdl/marvell_guess.bsd\nDevice Id: 00011010010001100100000001101001 (0x1A464069)\n  Filename:     support_files/bsdl/25652kv18_x36_165.bsd\nDevice Id: 00011010010001100100000001101001 (0x1A464069)\n  Filename:     support_files/bsdl/25652kv18_x36_165.bsd\nDevice Id: 00011010010001100100000001101001 (0x1A464069)\n  Filename:     support_files/bsdl/25652kv18_x36_165.bsd\nDevice Id: 00011010010001100100000001101001 (0x1A464069)\n  Filename:     support_files/bsdl/25652kv18_x36_165.bsd\nDevice Id: 00010110110101001010000010010011 (0x16D4A093)\n  Filename:     support_files/bsdl/XC2C256_VQ100.bsdl\nDevice Id: 01100100001010001000000010010011 (0x64288093)\n  Filename:     support_files/bsdl/xc6vsx475t_ff1759.bsd\nDevice Id: 00000100010000001111000111100001 (0x0440F1E1)\n  Filename:     support_files/bsdl/ct_wrap_440EPx_B_Full.bsd\n'
 
+JTAG_SCAN2_CYPRESS = 'Connected to libftdi driver.\nIR length: 64\nChain length: 11\nDevice Id: 00011000000000000110000110010111 (0x18006197)\n  Filename:     support_files/bsdl/MAX16071.BSD\nDevice Id: 00011000000000000110000110010111 (0x18006197)\n  Filename:     support_files/bsdl/MAX16071.BSD\nDevice Id: 00000000000000000000001111010011 (0x000003D3)\n  Filename:     support_files/bsdl/marvell_guess.bsd\nDevice Id: 00000000000000000000001111010011 (0x000003D3)\n  Filename:     support_files/bsdl/marvell_guess.bsd\nDevice Id: 00011010010001100100000001101001 (0x1A464069)\n  Filename:     support_files/bsdl/25652kv18_x36_165.bsd\nDevice Id: 00011010010001100100000001101001 (0x1A464069)\n  Filename:     support_files/bsdl/25652kv18_x36_165.bsd\nDevice Id: 00011010010001100100000001101001 (0x1A464069)\n  Filename:     support_files/bsdl/25652kv18_x36_165.bsd\nDevice Id: 00011010010001100100000001101001 (0x1A464069)\n  Filename:     support_files/bsdl/25652kv18_x36_165.bsd\nDevice Id: 00010110110101001010000010010011 (0x16D4A093)\n  Filename:     support_files/bsdl/XC2C256_VQ100.bsdl\nDevice Id: 10000100001010001000000010010011 (0x84288093)\n  Filename:     support_files/bsdl/xc6vsx475t_ff1759.bsd\nDevice Id: 00000100010000001111000111100001 (0x0440F1E1)\n  Filename:     support_files/bsdl/ct_wrap_440EPx_B_Full.bsd\n'

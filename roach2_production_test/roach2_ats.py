@@ -384,19 +384,21 @@ def open_ftdi_d():
   return f
 
 def disable_ftdi_a():
-  f = ftdi.ftdi_context()
-  ftdi.ftdi_init(f)
-  res = ftdi.ftdi_set_interface(f, ftdi.INTERFACE_A)
-  if res <> 0:
-    raise Exception('FTDI Interface ERROR: %s' %ftdi_int_err[res])
-  res = ftdi.ftdi_usb_open(f, defs.R2_VID, defs.R2_PID)
-  if res <> 0:
-    raise Exception('FTDI Open ERROR: %s' %ftdi_open_err[res])
-  # Set all lins on interface A as inputs.
-  res = ftdi.ftdi_set_bitmode(f, 0x00, ftdi.BITMODE_BITBANG)
-  if res <> 0:
-    raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
-  ftdi.ftdi_usb_close(f)
+  try:
+    f = ftdi.ftdi_context()
+    ftdi.ftdi_init(f)
+    res = ftdi.ftdi_set_interface(f, ftdi.INTERFACE_A)
+    if res <> 0:
+      raise Exception('FTDI Interface ERROR: %s' %ftdi_int_err[res])
+    res = ftdi.ftdi_usb_open(f, defs.R2_VID, defs.R2_PID)
+    if res <> 0:
+      raise Exception('FTDI Open ERROR: %s' %ftdi_open_err[res])
+    # Set all lins on interface A as inputs.
+    res = ftdi.ftdi_set_bitmode(f, 0x00, ftdi.BITMODE_BITBANG)
+    if res <> 0:
+      raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
+  finally:
+    ftdi.ftdi_usb_close(f)
 
 def open_ftdi_b():
   try:
@@ -780,6 +782,24 @@ def get_assigned_ip(ser_obj, bof_file):
   stop_idx = buff.find('Bcast:') - 1 
   return buff[start_idx:stop_idx]
 
+
+def rd_eeprom(addr):
+  if check_ppc_i2c():
+    try:
+      i2c_bus = open_ftdi_b()
+    except:
+      raise
+    try:
+      data = []
+      for i in range (256):
+        data.append(iicf.i2c_regread(i2c_bus, addr, i))
+      return data
+    finally:
+      i2c_bus.Close()
+  else:
+    raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), EEPROM contents not read.')
+
+
 if __name__ == "__main__":
   
   p = OptionParser()
@@ -826,7 +846,7 @@ if __name__ == "__main__":
   logger = logging.getLogger('r2_ats')
   logger.setLevel(logging.DEBUG)
   # create file handler which logs event debug messages
-  fh = logging.FileHandler('test.log')
+  fh = logging.FileHandler('r2_ats_general.log')
   fh.setLevel(logging.DEBUG)
   # create console handler with a higher log level
   ch = logging.StreamHandler()
@@ -856,6 +876,7 @@ if __name__ == "__main__":
     'r':c.ENDC,
     't':c.ENDC,
     'y':c.ENDC,
+    'u':c.ENDC,
     'q':c.ENDC,
     'm':c.ENDC
   }
@@ -879,6 +900,7 @@ if __name__ == "__main__":
   sfp_ok = False
   test_usb = False
   uboot_rem = False
+  disable_jtag = False
   quit = False
 
   # print_menu and menu_refresh is used to only reprint the menu when something changes.
@@ -932,6 +954,7 @@ if __name__ == "__main__":
         sfp_ok = False
         test_usb = False
         uboot_rem = False
+        disable_jtag = False
         print_menu = True
         menu_refresh = False
         os.system('clear')
@@ -973,6 +996,8 @@ if __name__ == "__main__":
         col['t'] = c.OKGREEN
       if sfp_ok:
         col['y'] = c.OKGREEN
+      if disable_jtag:
+        col['u'] = c.OKGREEN
       
       if print_menu:
         manuf_id = sn['manufacturer']
@@ -1001,6 +1026,7 @@ if __name__ == "__main__":
         print col['r'] + '    r) Run preliminary DDR3, ZDOK, TGE, 1GE tests' + c.ENDC
         print col['t'] + '    t) Test PPC USB host' + c.ENDC
         print col['y'] + '    y) Test SFP+ Cards' + c.ENDC
+        print col['u'] + '    u) Disable FTDI JTAG interface' + c.ENDC
         print col['m'] + '    m) Unload U-Boot (if U-Boot does not start correctly and holds the I2C bus).' + c.ENDC
         print col['q'] + '    q) Quit' + c.ENDC
       answer = getkey()
@@ -1064,6 +1090,34 @@ if __name__ == "__main__":
       elif '6' in answer:
         press_pb('on')
         print c.OKBLUE + ('\n    Scanning JTAG chain.') + c.ENDC
+        print '        Press any key to scan normal chain.'
+        print '        Press 1 to shorten chain to PPC, CPLD and FPGA' + c.ENDC
+        answer = getkey_block()
+        if '1' in answer:
+          # Code to shorten the JTAG chain.
+          try:
+            f = open_ftdi_d()
+            res = ftdi.ftdi_set_bitmode(f, 0x08, ftdi.BITMODE_BITBANG)
+            if res <> 0:
+             raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
+            res = ftdi_write(f, '\x08')
+            if res <> 1:
+              raise Exception('ERROR: FTDI write error, code: %d' %res)
+          finally:
+            ftdi.ftdi_usb_close(f)
+            load_uboot = True
+        else:
+          # Code to restore the JTAG chain.
+          try:
+            f = open_ftdi_d()
+            res = ftdi.ftdi_set_bitmode(f, 0x08, ftdi.BITMODE_BITBANG)
+            if res <> 0:
+             raise Exception('FTDI bitmode set ERROR: %s' %ftdi_bit_err[res])
+            res = ftdi_write(f, '\x00')
+            if res <> 1:
+              raise Exception('ERROR: FTDI write error, code: %d' %res)
+          finally:
+            ftdi.ftdi_usb_close(f)
         scan_jtag = False
         scan_jtag_chain()
         print_menu = True
@@ -1088,31 +1142,22 @@ if __name__ == "__main__":
         print_menu = True
       elif '8' in answer:
         read_eeprom = False
-        if check_ppc_i2c():
-          try:
-            i2c_bus = open_ftdi_b()
-          except:
-            raise
-          try:
-            print ('\n\nEEPROM at 0x%02x' %iicf.ADDR_BOOT_EEPROM_0)
-            for i in range (256):
-              if (i % 0x10 == 0):
-                print('\n0x%02x' %i),
-              print ('%02x' %(iicf.i2c_regread(i2c_bus, iicf.ADDR_BOOT_EEPROM_0, i))),
-
-            print ('\n\nEEPROM at 0x%02x' %iicf.ADDR_BOOT_EEPROM_1)
-            for i in range (256):
-              if (i % 0x10 == 0):
-                print('\n0x%02x' %i),
-              print ('%02x' %(iicf.i2c_regread(i2c_bus, iicf.ADDR_BOOT_EEPROM_1, i))),
-            print''
-            print''
-            read_eeprom = True
-          finally:
-            i2c_bus.Close()
-            print_menu = True
-        else:
-          raise Exception('ERROR: I2c bus could not be secured from the PPC (check PPC state), EEPROM contents not read.')
+        print ('\n\nEEPROM at 0x%02x' %iicf.ADDR_BOOT_EEPROM_0)
+        data = rd_eeprom(iicf.ADDR_BOOT_EEPROM_0)
+        for i in range (256):
+          if (i % 0x10 == 0):
+            print('\n0x%02x' %i),
+          print ('%02x' %data[i]),
+        print ('\n\nEEPROM at 0x%02x' %iicf.ADDR_BOOT_EEPROM_1)
+        data = rd_eeprom(iicf.ADDR_BOOT_EEPROM_1)
+        for i in range (256):
+          if (i % 0x10 == 0):
+            print('\n0x%02x' %i),
+          print ('%02x' %data[i]),
+        print ''
+        print ''
+        read_eeprom = True
+        print_menu = True
       elif '9' in answer:
         print c.OKBLUE + ('\n    Checking FLASH and PPC DDR2 memory.') + c.ENDC
         try:
@@ -1142,7 +1187,7 @@ if __name__ == "__main__":
             if retry > 0:
               print'INFO: XModem transfer failed... retrying.'
             retry += 1
-            sent = xmodem_trans(file_to_send, fh)
+            sent = xmodem_trans(file_to_send, logger)
           if not sent:
             raise Exception('FATAL: U-Boot Xmodem transfer not successfull.')
           if not find_str_ser(ser, 'SDRAM test passes', 1)[0]:
@@ -1295,19 +1340,63 @@ if __name__ == "__main__":
           raise
         try:
           print c.OKBLUE + '\n    Testing QDR memory.' + c.ENDC
-          press_pb('off')
+          #press_pb('off')
           qdr_ok = False
+          calfault = 0
           ser.flushInput()
           ser.flushOutput()
-          try:
-            with open('/home/nfs/roach2/current/boffiles/%s'%defs.QDR_TST_BOF) as f: pass
-          except:
-            inpath = 'support_files/%s'%defs.QDR_TST_BOF
-            outpath = '/home/nfs/roach2/current/boffiles/%s'%defs.QDR_TST_BOF
-            shutil.copyfile(inpath, outpath)
-            os.chmod(outpath, 0777)
-          ip_addr = get_assigned_ip(ser, defs.QDR_TST_BOF)
-          qdr_ok = qdr_tst.test_qdr(ip_addr, defs.QDR_TST_BOF)
+          err_list=[]
+          working_bof =''
+          # Get the serial number
+          data = rd_eeprom(iicf.ADDR_BOOT_EEPROM_0)
+          rd_ser_num = data[16:21]
+          if (reduce(lambda x,y:x+y, rd_ser_num) == 0xff*5):
+            print c.WARNING + 'Serial number not set for this board. Test will continue but log files will not contain serial number.' + c.ENDC
+            time.sleep(5)
+          rd_ser_num = ''.join(map('{0:02x}'.format, rd_ser_num))
+          # create logger for qdr
+          qdr_log = logging.getLogger('qdr_log')
+          qdr_log.setLevel(logging.DEBUG)
+          qdr_fh = logging.FileHandler('log/qdr_sn_0x{0}.log'.format(rd_ser_num))
+          qdr_fh.setLevel(logging.INFO)
+          # create console handler with a higher log level
+          qdr_ch = logging.StreamHandler()
+          qdr_ch.setLevel(logging.ERROR)
+          # create formatter and add it to the handlers
+          formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+          qdr_fh.setFormatter(formatter)
+          # add the handlers to the logger
+          qdr_log.addHandler(qdr_fh)
+          qdr_log.addHandler(qdr_ch)
+          for i in range(len(defs.QDR_TST_BOF)):
+            try:
+              inpath = 'support_files/%s'%defs.QDR_TST_BOF[i]
+              outpath = '/home/nfs/roach2/current/boffiles/%s'%defs.QDR_TST_BOF[i]
+              shutil.copyfile(inpath, outpath)
+              os.chmod(outpath, 0777)
+            except: pass  
+            ip_addr = get_assigned_ip(ser, defs.QDR_TST_BOF[i])
+            qdr_ok = qdr_tst.test_qdr(ip_addr, defs.QDR_TST_BOF[i], qdr_log, rd_ser_num, True, 4)
+            if not(qdr_ok):
+              # Create a list of bofs that cause calibration errors
+              err_list.append(defs.QDR_TST_BOF[i])
+            else:
+              # Do a memory test with the last working bof
+              working_bof = defs.QDR_TST_BOF[i]
+            
+          # Perform full qdr test if any boffiles passed calibration 
+          if len(working_bof):
+            qdr_ok = qdr_tst.test_qdr(ip_addr, working_bof, qdr_log, rd_ser_num)
+            if len(err_list):
+              print c.WARNING + 'The following boffiles did not calibrate:' 
+              for i in range(len(err_list)):
+                print err_list[i]
+              print c.ENDC
+          else:
+            print c.FAIL + 'The QDRs could not be calibrated!' + c.ENDC
+              
+          if not(qdr_ok):
+            print c.FAIL + 'QDR Tests Failed!' + c.ENDC
         finally:
           try: 
             for f in fpga: f.close()
@@ -1345,6 +1434,9 @@ if __name__ == "__main__":
           print_outp_ser(ser, 2)
           ser.write('r2bit ddr3\n')
           print_outp_ser(ser, 2)
+          for i in range(4):
+            ser.write('r2bit qdr %d\n' %i)
+            print_outp_ser(ser, 2)
           for i in range(8):
             ser.write('r2bit tge %d\n' %i)
             print_outp_ser(ser, 2)
@@ -1419,6 +1511,12 @@ if __name__ == "__main__":
         finally:
           ser.close()
           print_menu = True
+      elif 'u' in answer:
+        print c.OKBLUE + ('\n    Disabling FTDI JTAG interface.') + c.ENDC
+        disable_jtag = False
+        disable_ftdi_a()
+        print_menu = True
+        disable_jtag = True
       elif 'm' in answer:
         print c.OKBLUE + ('\n    Removing U-Boot.') + c.ENDC
         uboot_rem = False

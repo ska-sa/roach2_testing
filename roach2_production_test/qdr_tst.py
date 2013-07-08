@@ -69,6 +69,8 @@ def exec_test(fpga, qdr, test, addr_sel, testDuration, reportLen, txrxsnapdump):
 #   Enable test  
     fpga.write_int('en',1)
     
+    #print 'EN register value: %d' %fpga.read_int('en')
+    #print 'EN register value: %d' %fpga.read_int('en')
 #   Wait for 1 sec (about 25 times through all addresses)
     time.sleep(testDuration)
     
@@ -80,10 +82,10 @@ def exec_test(fpga, qdr, test, addr_sel, testDuration, reportLen, txrxsnapdump):
 
     if tx_cnt == 0:
         print ('>>>>>ERR: Not transmitting anything. This should not happen. Exiting.')
-        exit_clean()
+        #exit_clean()
     if rx_cnt == 0:
         print ('>>>>>ERR: QDR {0} Not reading anything. This should not happen. Exiting.'.format(qdr))
-        exit_clean()
+        #exit_clean()
 
 #   Read error counter        
     err_cnt=fpga.read_int('err_cnt{0}'.format(qdr))
@@ -127,18 +129,21 @@ def exec_test(fpga, qdr, test, addr_sel, testDuration, reportLen, txrxsnapdump):
 
 def exit_clean():
     try:
-        for f in fpgas: f.stop()
+        for f in fpga: f.stop()
     except: pass
     try:
         for t in teln: t.close()
     except: pass
 
-def test_qdr(roachIP, boffile, testDuration = 1, reportLen = 10, txrxsnapdump = 0):
+def test_qdr(roachIP, boffile, logger, ser_num, calonly = False, numCalRuns = 10, testDuration = 1, reportLen = 10, txrxsnapdump = 0):
   """Test QDR's
 
   Keyword arguments:
   roachIP -- ROACH2 ip address string (netbooted)
   boffile -- Boffile to program
+  logger  -- Logger for test run 
+  ser_num -- serial number of board under test
+  calonly -- Only calibrate if true, calibrate and test if false
   testDuration -- Specifies the test duration
   reportLen -- Specifies the ammount of errors to report
   txrxsnapdump -- Number of snap blocks to display
@@ -152,59 +157,103 @@ def test_qdr(roachIP, boffile, testDuration = 1, reportLen = 10, txrxsnapdump = 
       
       
   try:
-      lh=corr.log_handlers.DebugLogHandler()
-      logger = logging.getLogger('R2_QDR_Testing')
-      logger.addHandler(lh)
-      logger.setLevel(10)
+      # create logger for all qdr test runs
+      global_log = logging.getLogger('global_qdr_log')
+      global_fh = logging.FileHandler('log/qdr_test.log')
+      global_fh.setLevel(logging.DEBUG)
+      # create formatter and add it to the handlers
+      formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+      global_fh.setFormatter(formatter)
+      # add the handlers to the logger
+      global_log.addHandler(global_fh)
 
-      print('    Connecting to TCPBorph server on %s... '%(roachIP)),
+      if calonly:
+        numRuns = numCalRuns
+      else:
+        numRuns = 1
+      print('\n\nConnecting to TCPBorph server on %s... '%(roachIP)),
       sys.stdout.flush()
       fpga = corr.katcp_wrapper.FpgaClient(roachIP, logger = logger)
       time.sleep(1)
       if not fpga.is_connected():
         raise Exception('ERROR: Connection to TCPBorph server not successful.')
       print 'done.'
-      print '    Configuring FPGA...',
       sys.stdout.flush()
       try:
         teln = telnetlib.Telnet(roachIP, 7147)
       except:
         raise
-      teln.write('?progdev %s\n'%boffile)
-      timeout = 0
-      found = False
-      response = ''
-      while not found and timeout < 10:
-        time.sleep(1)
-        timeout += 1
-        response = response + teln.read_very_eager()
-        if response.find('!progdev ok') <> -1:
-          found = True
-      if not found:
-        teln.close()
-        raise Exception('ERROR: Boffile not programmed. Error message:\n%s'%response)
-      print 'boffile programmed.'
+      for i in range(numRuns):
+        print 'Configuring FPGA with boffile: ' + boffile + '...',
+        logger.info('Configuring FPGA with boffile: ' + boffile)
+        teln.write('?progdev %s\n'%boffile)
+        timeout = 0
+        found = False
+        response = ''
+        while not found and timeout < 10:
+          time.sleep(1)
+          timeout += 1
+          response = response + teln.read_very_eager()
+          if response.find('!progdev ok') <> -1:
+            found = True
+        if not found:
+          teln.close()
+          raise Exception('ERROR: Boffile not programmed. Error message:\n%s'%response)
+        print 'boffile programmed.'
+
+        print '---------------------------------'
+        print ' Checking QDR Calibration Status '  
+        print '---------------------------------'
+        
+#   Check that QDR's are calibrated and ready before doing any tests!   
+        for qdr in range(0, num_qdr):       
+           cal_fail=fpga.read_int('cal_fail{0}'.format(qdr))
+           if cal_fail != 0:
+              qdr_fail[qdr] += 1     
+              logger.error('QDR {0} '.format(qdr)+' did NOT calibrate!')
+              
+           phy_ready=fpga.read_int('phy_rdy{0}'.format(qdr))
+           if phy_ready != 1:
+              qdr_fail[qdr] += 1
+              logger.error('QDR {0} '.format(qdr)+' is not ready!')
+
+           logger.info('QDR{0} delay elements inserted:'.format(qdr))
+           dly_elm = ''
+           for idx in range(0,36):
+             cnt = struct.unpack('>I', fpga.read('qdr{0}_ctrl'.format(qdr), 4, 4*(idx+3)))[0]
+             dly_elm += '{0:02d},'.format(cnt)
+             #dly_elm += 'Bit {0:02d} = {1:02d}, '.format(idx,cnt)
+           logger.info(dly_elm)
+
       teln.close()
       sys.stdout.flush()
 
-      print '---------------------------------'
-      print ' Checking QDR Calibration Status '  
-      print '---------------------------------'
-      
-#   Check that QDR's are calibrated and ready before doing any tests!   
-      for qdr in range(0, num_qdr):       
-         cal_fail=fpga.read_int('cal_fail{0}'.format(qdr))
-         if cal_fail != 0:
-            qdr_fail[qdr] = 1     
-            print ('>>>>>ERR: QDR {0} '.format(qdr)+' did NOT calibrate! Skipping tests.')
-            time.sleep(1)          
-            
-         phy_ready=fpga.read_int('phy_rdy{0}'.format(qdr))
-         if phy_ready != 1:
-            qdr_fail[qdr] = 1
-            print ('>>>>>ERR: QDR {0} '.format(qdr)+' is not ready! Skipping tests.')
-            time.sleep(1)
-                          
+      if calonly:
+        print ('')
+        print ('---------------------------------------')
+        print (' Test Summary for {0} Calibration Runs '.format(numCalRuns))
+        print ('---------------------------------------')
+        logger.info('Test Summary for {0} Calibration Runs '.format(numCalRuns))
+        global_log.info('BOARD SN: {0}: Test summary for {1} calibration runs using {2}'.format(ser_num, numCalRuns, boffile))
+              
+        for qdr in range(0, num_qdr):
+           if qdr_fail[qdr] == 0:                  
+              print('QDR {0}: '.format(qdr)+'Calibration succesful') 
+              logger.info('QDR {0}: '.format(qdr)+'Calibration succesful') 
+              global_log.info('QDR {0}: '.format(qdr)+'Calibration succesful') 
+           else:
+              print('QDR {0}: '.format(qdr)+'Calibration failed {0} times!'.format(qdr_fail[qdr]))
+              logger.info('QDR {0}: '.format(qdr)+'Calibration failed {0} times!'.format(qdr_fail[qdr]))
+              global_log.info('QDR {0}: '.format(qdr)+'Calibration failed {0} times!'.format(qdr_fail[qdr]))
+        print('')
+        #global_fh.close()
+        fpga.stop()
+        teln.close()
+        if sum(qdr_fail):
+          return False
+        else:
+          return True
+
       print '---------------------------------'
       print ' Incremental Address Test Suite  '  
       print '---------------------------------'       
@@ -232,21 +281,34 @@ def test_qdr(roachIP, boffile, testDuration = 1, reportLen = 10, txrxsnapdump = 
       print ' Test Summary                    '  
       print '---------------------------------'
             
+      logger.info('Full QDR test summary using {0}'.format(boffile))
+      global_log.info('BOARD SN: {0}: Full QDR test summary using {1}'.format(ser_num, boffile))
       for qdr in range(0, num_qdr):
          if qdr_fail[qdr] == 0:                  
             print 'QDR {0}: '.format(qdr)+'Total Test Errors:  {0}'.format(errors[qdr]) 
+            logger.info('QDR {0}: '.format(qdr)+'Total Test Errors:  {0}'.format(errors[qdr])) 
+            global_log.info('QDR {0}: '.format(qdr)+'Total Test Errors:  {0}'.format(errors[qdr])) 
          else:
             print 'QDR {0}: '.format(qdr)+'No tests performed due to calibration failure!'
-         
+            logger.info('QDR {0}: '.format(qdr)+'No tests performed due to calibration failure!')
+            global_log.info('QDR {0}: '.format(qdr)+'No tests performed due to calibration failure!')
+      print ''
   except KeyboardInterrupt:
+      fpga.stop()
+      teln.close()
       exit_clean()
-  except:
+  except Exception:
+      logger.exception('')
       #exc_type = sys.exc_info()[0]
       #exc_mess = sys.exc_info()[1]
       #print 'Exception type: %s Message: %s' %(exc_type, exc_mess)
+      fpga.stop()
+      teln.close()
       exit_clean()
       raise
-
+   
+  fpga.stop()
+  teln.close()
   exit_clean()
   # Add qdr_fail and error lists together to determine if any errors occured.
   if (reduce(lambda x,y: x+y, qdr_fail) + reduce(lambda x,y: x+y, errors)):
