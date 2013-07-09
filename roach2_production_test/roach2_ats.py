@@ -1376,27 +1376,35 @@ if __name__ == "__main__":
               os.chmod(outpath, 0777)
             except: pass  
             ip_addr = get_assigned_ip(ser, defs.QDR_TST_BOF[i])
-            qdr_ok = qdr_tst.test_qdr(ip_addr, defs.QDR_TST_BOF[i], qdr_log, rd_ser_num, True, 4)
+            qdr_ok = qdr_tst.test_qdr(ip_addr, defs.QDR_TST_BOF[i], qdr_log, rd_ser_num, True, 6)
             if not(qdr_ok):
               # Create a list of bofs that cause calibration errors
               err_list.append(defs.QDR_TST_BOF[i])
             else:
               # Do a memory test with the last working bof
+              prev_wrk_bof = working_bof
               working_bof = defs.QDR_TST_BOF[i]
             
           # Perform full qdr test if any boffiles passed calibration 
           if len(working_bof):
-            qdr_ok = qdr_tst.test_qdr(ip_addr, working_bof, qdr_log, rd_ser_num)
+            if len(prev_wrk_bof):
+              qdr_ok = qdr_tst.test_qdr(ip_addr, prev_wrk_bof, qdr_log, rd_ser_num)
+            else:
+              qdr_ok = qdr_tst.test_qdr(ip_addr, working_bof, qdr_log, rd_ser_num)
             if len(err_list):
               print c.WARNING + 'The following boffiles did not calibrate:' 
+              qdr_log.info('The following boffiles did not calibrate:')
               for i in range(len(err_list)):
                 print err_list[i]
+                qdr_log.info(err_list[i])
               print c.ENDC
           else:
             print c.FAIL + 'The QDRs could not be calibrated!' + c.ENDC
               
           if not(qdr_ok):
             print c.FAIL + 'QDR Tests Failed!' + c.ENDC
+          else:
+            print c.OKGREEN + 'QDR Tests Passed.' + c.ENDC
         finally:
           try: 
             for f in fpga: f.close()

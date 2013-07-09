@@ -3,8 +3,6 @@
 import corr, time, struct, sys, logging, socket, telnetlib
 import construct
 
-
-
 # Tests to be performed
 test_string = ['Address','A5','F0','Walking 0s','Walking 1s','Pseudo Random Number']
 
@@ -158,16 +156,16 @@ def test_qdr(roachIP, boffile, logger, ser_num, calonly = False, numCalRuns = 10
       
   try:
       # create logger for all qdr test runs
-      global_log = logging.getLogger('global_qdr_log')
+      global_log = logging.getLogger('qdr_test_log')
       global_log.setLevel(logging.DEBUG)
-      global_fh = logging.FileHandler('log/qdr_test.log')
-      global_fh.setLevel(logging.DEBUG)
-      # create formatter and add it to the handlers
-      formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-      global_fh.setFormatter(formatter)
-      # add the handlers to the logger
-      global_log.addHandler(global_fh)
-
+      if not(global_log.handlers):
+        global_fh = logging.FileHandler('log/qdr_test.log')
+        global_fh.setLevel(logging.DEBUG)
+        # create formatter and add it to the handlers
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        global_fh.setFormatter(formatter)
+        # add the handlers to the logger
+        global_log.addHandler(global_fh)
       if calonly:
         numRuns = numCalRuns
       else:
