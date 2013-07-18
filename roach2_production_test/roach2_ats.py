@@ -1357,7 +1357,7 @@ if __name__ == "__main__":
           # create logger for qdr
           qdr_log = logging.getLogger('qdr_log')
           qdr_log.setLevel(logging.DEBUG)
-          qdr_fh = logging.FileHandler('log/qdr_sn_0x{0}.log'.format(rd_ser_num))
+          qdr_fh = logging.FileHandler('log/0x{0}_qdr.log'.format(rd_ser_num))
           qdr_fh.setLevel(logging.INFO)
           # create console handler with a higher log level
           qdr_ch = logging.StreamHandler()
