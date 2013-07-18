@@ -22,6 +22,7 @@ MANUF = {
   'Elprom'  : 0x45,
   'Digicom' : 0x44
 }
+MANUF_DEF = 'Digicom'
 
 # Voltage monitor mappings to channel on max16071 (I2C addresses: 0x50, 0x51)
 u16 = i2c_functions.ADDR_V_MON

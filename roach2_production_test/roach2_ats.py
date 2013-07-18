@@ -275,7 +275,7 @@ def getkey_block():
 
 def set_serial_number():
   if SEL_MANUF:
-    print "    Select manufacturer (default = Digicom):"
+    print "    Select manufacturer (default = %s):" %(defs.MANUF_DEF)
     for i, v in enumerate(defs.MANUF):
       print ("    %d) %s" %(i+1, v))
     answer = getkey_block()
@@ -284,11 +284,11 @@ def set_serial_number():
       if ans in range(1, i+2):
         manuf = defs.MANUF.values()[ans-1]
       else:
-        manuf = defs.MANUF['Digicom']
+        manuf = defs.MANUF[defs.MANUF_DEF]
     except ValueError:
-      manuf = defs.MANUF['Digicom']
+      manuf = defs.MANUF[defs.MANUF_DEF]
   else:
-    manuf = defs.MANUF['Digicom']
+    manuf = defs.MANUF[defs.MANUF_DEF]
   done = False
   while not done:
     batch = raw_input("    Batch Number (0-255): ")
