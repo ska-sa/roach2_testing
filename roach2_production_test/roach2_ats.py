@@ -1294,6 +1294,59 @@ if __name__ == "__main__":
               raise Exception('ERROR: IP address not assigned, check connections and DHCP server.')
             if not find_str_ser(ser, 'done\r\n=>', 5.5*60)[0]:
               raise Exception('ERROR: Root file system did not load.')
+
+            ser.write('reset\n')
+            if find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
+              ser.write('\n')
+            else:
+              raise Exception('ERROR: U-Boot did not load correctly.')
+            ser.write('run soloboot\n')
+            print '\n    Waiting for Linux to boot, this may take a minute...',
+            sys.stdout.flush()
+            if not find_str_ser(ser, 'Linux/PowerPC load:', 10, False)[0]:
+              raise Exception('ERROR: Linux did not boot correctly.')
+            print 'loading romfs...',
+            sys.stdout.flush()
+            if not find_str_ser(ser, 'login:', 10, False)[0]:
+              raise Exception('ERROR: Linux did not boot correctly.')
+            print 'done.'
+            sys.stdout.flush()
+            print '    Removing .keep file from /usr to trigger new configuration...',
+            ser.write('root\n')
+            time.sleep(0.1)
+            ser.flushInput()
+            ser.flushOutput()
+            ser.write('\n\n')
+            ser.write('rm /usr/.keep\n')
+            sys.stdout.flush()
+            ser.write('sync\n')
+            sys.stdout.flush()
+            print 'done.'
+            ser.write('reboot\n')
+            if find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
+              ser.write('\n')
+            else:
+              raise Exception('ERROR: U-Boot did not load correctly.')
+            ser.write('run soloboot\n')
+            print '    Waiting for Linux to boot, this may take a minute...',
+            sys.stdout.flush()
+            if not find_str_ser(ser, 'Linux/PowerPC load:', 10, False)[0]:
+              raise Exception('ERROR: Linux did not boot correctly.')
+            print 'loading romfs...',
+            sys.stdout.flush()
+            if not find_str_ser(ser, 'login:', 10, False)[0]:
+              raise Exception('ERROR: Linux did not boot correctly.')
+            print 'done.'
+            ser.write('root\n')
+            time.sleep(0.1)
+            ser.flushInput()
+            ser.flushOutput()
+            ser.write('\n\n')
+            sys.stdout.flush()
+            ser.write('poweroff\n')
+            if not find_str_ser(ser, 'System Halted', 1, True)[0]:
+              raise Exception('ERROR: Linux not booted correctly or configuration not updated correctly.')
+            print c.OKGREEN + '\n\nROM file system successfully loaded.' + c.ENDC
             root_load = True
         finally:
           ser.close()
