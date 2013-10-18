@@ -541,7 +541,7 @@ def scan_jtag_chain():
   proc = subprocess.Popen(['python', 'scan_chain.py'], stdout=subprocess.PIPE)
   out = proc.communicate()[0]
   print 'done.'
-  if (out == defs.JTAG_SCAN_CYPRESS) | (out == defs.JTAG_SCAN_RENESAS):
+  if (out == defs.JTAG_SCAN_CYPRESS) | (out == defs.JTAG_SCAN2_CYPRESS) | (out == defs.JTAG_SCAN_RENESAS):
     print '    JTAG chain succesfully scanned.\n'
   else:
     raise Exception, ('FATAL: JTAG scan chain not correct: \n\n%s' %out)
