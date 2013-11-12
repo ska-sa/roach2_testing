@@ -64,7 +64,7 @@ def print_report(connections, link, rx_cnt_ok, tx_cnt, rx_cnt_bad, rx_wrd_cnt_fa
                     print termcolors.colorize('%5.1f%% pkts received ok.'%(round(float(rx_cnt_ok[rx_n])/tx_cnt[tx_n]*100,1)),fg='green'),
                 else:
                     failed=True
-                if (rx_cnt_bad[rx_n]>10) or (rx_wrd_cnt_fail[rx_n]):
+                if (rx_cnt_bad[rx_n]>10) or (rx_wrd_cnt_fail[rx_n]>1):
                     print termcolors.colorize('Some bad data received! BER: %f.'%(error_rate[lnk]),fg='red'),
                     failed=True
                 if (rx_wrd_cnt_missing[rx_n]>5000):
@@ -147,7 +147,7 @@ def trans_test(roach, desired_rate = 8.0, pkt_size = 1024, skip = False, debug =
 
             print "\tWaiting 12s for ARP to complete...",
             sys.stdout.flush()
-            time.sleep(20)
+            time.sleep(12)
             print 'done'
 
         if debug:
@@ -279,7 +279,7 @@ def trans_test(roach, desired_rate = 8.0, pkt_size = 1024, skip = False, debug =
                     sys.stdout.flush()
         print 'done'
 
-        cont=5
+        cont=15
         core_stat=range(8)
         link_stat=range(8)
         link=range(8)
@@ -364,7 +364,8 @@ def trans_test(roach, desired_rate = 8.0, pkt_size = 1024, skip = False, debug =
                     if (link[lnk] and rx_n>=0):
                         print termcolors.colorize('%12i'%(rx_cnt_ok[rx_n]),fg='green' if rx_cnt_ok[rx_n]>0 else 'red'),
                         print termcolors.colorize('%12i'%(rx_cnt_bad[rx_n]),fg='green' if rx_cnt_bad[rx_n]==0 else 'red'),
-                        print termcolors.colorize('%12i'%(rx_wrd_cnt_fail[rx_n]),fg='green' if rx_wrd_cnt_fail[rx_n]==0 else 'red'),
+                        #rx_wrd_cnt_Fail sometimes contain 1, this is due to initialization error and is not conciderd a link error. So only show errors if the count is more than 1
+                        print termcolors.colorize('%12i'%(rx_wrd_cnt_fail[rx_n]),fg='green' if rx_wrd_cnt_fail[rx_n]<2 else 'red'),
                         print termcolors.colorize('%12i'%(rx_wrd_cnt_missing[rx_n]),fg='green' if rx_wrd_cnt_missing[rx_n]==0 else 'red'),
                         print termcolors.colorize('        %12e'%(error_rate[lnk]),fg='green' if error_rate[lnk]<1e-5 else 'red')
                     else:
