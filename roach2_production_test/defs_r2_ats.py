@@ -173,7 +173,6 @@ UBOOT_REV2_MEMTEST = '/home/nfs/roach2/boot/u-boot-memtest-r2-rev2.bin'
 
 #array of boffiles to test calibration
 QDR_TST_BOF = ['qdr_no_front_delay.bof.gz', 'qdr_tst_r2_2x_2013_Jul_05_0630_0_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_0926_1_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_1131_2_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_0956_3_otaps.bof.gz']
-#QDR_TST_BOF = 'r2_qdr_tst_r2_2x_2012_Oct_31_1248.bof'
 SFP_PLUS_BOF = 'r2_trans_test_2012_Oct_19_0911.bof'
 # Set xilinx source path
 XILINX_SRC_PATH = '/opt/Xilinx/12.4/LabTools/settings64.sh'

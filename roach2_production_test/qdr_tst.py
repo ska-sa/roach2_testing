@@ -71,9 +71,8 @@ def exec_test(fpga, qdr, test, addr_sel, testDuration, reportLen, txrxsnapdump):
     #print 'EN register value: %d' %fpga.read_int('en')
 #   Wait for 1 sec (about 25 times through all addresses)
     time.sleep(testDuration)
-    
     fpga.write_int('en',0)
-    
+#    time.sleep(1)
 #   Make sure that the data was written & read out   
     tx_cnt=fpga.read_int('tx_cnt')
     rx_cnt=fpga.read_int('rx_cnt{0}'.format(qdr))
@@ -87,13 +86,14 @@ def exec_test(fpga, qdr, test, addr_sel, testDuration, reportLen, txrxsnapdump):
 
 #   Read error counter        
     err_cnt=fpga.read_int('err_cnt{0}'.format(qdr))
-    
+#    print 'sleeping for 1 second'
+#    time.sleep(1)
 #   snap_err_addr - TX address 32 bits, but [18:0] effective 
-    addr_bram_dmp=fpga.read('snap_addr_bram'.format(qdr),4*reportLen) # read 10 x 32bit words (4 bytes)
+    addr_bram_dmp=fpga.read('snap_addr_bram',4*reportLen) # read 10 x 32bit words (4 bytes)
 #   snap_err_data - TX Written Data, 63:0
-    wr_data_bram_dmp=fpga.read('snap_tx_bram'.format(qdr),8*reportLen)# read 10 x 2 x 64bit words (16 bytes)
+    wr_data_bram_dmp=fpga.read('snap_tx_bram',8*reportLen)# read 10 x 2 x 64bit words (16 bytes)
 #   snap_err_data - RX 63:0 Read Data
-    rd_data_bram_dmp=fpga.read('snap_rx0_bram'.format(qdr),8*reportLen)# read 10 x 2 x 64bit words (16 bytes)
+    rd_data_bram_dmp=fpga.read('snap_rx0_bram',8*reportLen)# read 10 x 2 x 64bit words (16 bytes)
     
     if txrxsnapdump > 0:    
        print 'Reading TX snap blocks'
@@ -109,14 +109,18 @@ def exec_test(fpga, qdr, test, addr_sel, testDuration, reportLen, txrxsnapdump):
     data_bram_dmp=fpga.read('snap_err_data{0}_bram'.format(qdr),16*reportLen)# read 10 x 2 x 64bit words (16 bytes)
            
 #   Generate error report            
+    #print 'error count = {0}'.format(err_cnt)
+    #err_cnt = 0
     if err_cnt != 0:
         print '>>>>>ERR: QDR {0} '.format(qdr)+test_string[test]+': {0} Test Errors'.format(err_cnt)
         
         print 'Reading error snap blocks'
         for i in range(0,reportLen):
            addr_32bit = struct.unpack('>L',addr_bram_dmp[(4*i):(4*i)+4])[0] # >L 32bit unsigned
-           write_data_64bit = struct.unpack('>Q',data_bram_dmp[(16*i):(16*i)+8])[0] # >Q 64 bit unsigned
-           err_rd_data_64bit = struct.unpack('>Q',data_bram_dmp[(16*i)+8:(16*i)+16])[0] # >Q 64 bit unsigned
+           write_data_64bit = struct.unpack('>Q',wr_data_bram_dmp[(8*i):(8*i)+8])[0] # >Q 64 bit unsigned
+           err_rd_data_64bit = struct.unpack('>Q',data_bram_dmp[(8*i):(8*i)+8])[0] # >Q 64 bit unsigned
+           #write_data_64bit = struct.unpack('>Q',wr_data_bram_dmp[(16*i):(16*i)+8])[0] # >Q 64 bit unsigned
+           #err_rd_data_64bit = struct.unpack('>Q',data_bram_dmp[(16*i)+8:(16*i)+16])[0] # >Q 64 bit unsigned
            print 'Address: %8X Expected Data: %16X Received Data: %16X'%(addr_32bit,write_data_64bit,err_rd_data_64bit)
            
     print ' QDR {0} '.format(qdr)+'Test: '+test_string[test]+' completed.'
@@ -150,7 +154,7 @@ def test_qdr(roachIP, boffile, logger, ser_num, calonly = False, numCalRuns = 10
 
   errors = [0,0,0,0]
   qdr_fail = [0,0,0,0]
-  num_qdr = 4
+  num_qdr = 4 
   fpga = []
       
       
@@ -261,6 +265,8 @@ def test_qdr(roachIP, boffile, logger, ser_num, calonly = False, numCalRuns = 10
          if qdr_fail[qdr] == 0:  
             for test in range(0, 6):
                err_cnt_tmp = exec_test(fpga, qdr, test, 0, testDuration, reportLen, txrxsnapdump)
+               #print 'Sleeping between tests for 1 second'
+               #time.sleep(1)
                #   Global error count
                errors[qdr] = errors[qdr] + err_cnt_tmp
          

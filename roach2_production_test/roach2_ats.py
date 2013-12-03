@@ -923,6 +923,20 @@ if __name__ == "__main__":
     try:
       with open(ser_port) as f: 
         usb_conn = True
+        if not(sn_set):
+          # Get the serial number
+          data = rd_eeprom(iicf.ADDR_BOOT_EEPROM_0)
+          rd_ser_num = data[16:21]
+          #Check that serial number is present
+          if not(reduce(lambda x,y:x+y, rd_ser_num) == 0xff*5):
+            sn_set = True
+            sn = {     
+              'manufacturer' : rd_ser_num[0], 
+              'type'         : rd_ser_num[1], 
+              'revision'     : rd_ser_num[2],
+              'batch'        : rd_ser_num[3], 
+              'board'        : rd_ser_num[4] 
+            } 
     except IOError:
       # Detect disconnect
       if usb_conn:
@@ -1443,7 +1457,7 @@ if __name__ == "__main__":
             if len(prev_wrk_bof):
               qdr_ok = qdr_tst.test_qdr(ip_addr, prev_wrk_bof, qdr_log, rd_ser_num)
             else:
-              qdr_ok = qdr_tst.test_qdr(ip_addr, working_bof, qdr_log, rd_ser_num)
+              qdr_ok = qdr_tst.test_qdr(ip_addr, working_bof, qdr_log, rd_ser_num, testDuration = 2)
             if len(err_list):
               print c.WARNING + 'The following boffiles did not calibrate:' 
               qdr_log.info('The following boffiles did not calibrate:')
