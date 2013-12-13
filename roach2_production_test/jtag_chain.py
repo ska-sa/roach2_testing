@@ -17,9 +17,10 @@ class Jtag_chain:
     urc.bsdl_set_path(self.bsdlp)
     urc.cable("roach-2")
     urc.test_cable()
+    urc.set_frequency(100000)
     #not sure why this is neccesary, but without it the chain does not scan
     urc.set_trst(0)
-    urc.reset();
+    urc.reset()
     urc.tap_detect()
     urc.disconnect()
 

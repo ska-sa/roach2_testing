@@ -540,6 +540,7 @@ def scan_jtag_chain():
   sys.stdout.flush()
   proc = subprocess.Popen(['python', 'scan_chain.py'], stdout=subprocess.PIPE)
   out = proc.communicate()[0]
+  print out
   print 'done.'
   if (out == defs.JTAG_SCAN_CYPRESS) | (out == defs.JTAG_SCAN2_CYPRESS) | (out == defs.JTAG_SCAN_RENESAS):
     print '    JTAG chain succesfully scanned.\n'
@@ -567,6 +568,7 @@ def load_urj(urj_file):
   sys.stdout.flush()
   proc = subprocess.Popen(['jtag', urj_file], stdout=subprocess.PIPE)
   out = proc.communicate()[0]
+  print out
   print 'done.'
 
 def open_ftdi_uart(port, baud, timeout = 1):
@@ -850,7 +852,7 @@ if __name__ == "__main__":
   fh.setLevel(logging.DEBUG)
   # create console handler with a higher log level
   ch = logging.StreamHandler()
-  ch.setLevel(logging.ERROR)
+  ch.setLevel(logging.CRITICAL)
   # create formatter and add it to the handlers
   formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
   fh.setFormatter(formatter)
@@ -861,6 +863,7 @@ if __name__ == "__main__":
 
   # Set default colours
   DEF_C = {
+    'a':c.ENDC,
     '1':c.ENDC,
     '2':c.ENDC,
     '3':c.ENDC,
@@ -882,6 +885,8 @@ if __name__ == "__main__":
   }
 
   # Set menu flags
+  all_pass = False
+  run_full = False
   usb_conn = False
   sn_set = False
   power_test = False
@@ -897,7 +902,9 @@ if __name__ == "__main__":
   root_load = False
   cpld_done = False
   qdr_ok = False
+  bsp_ok = False
   sfp_ok = False
+  test_cx = False
   test_usb = False
   uboot_rem = False
   disable_jtag = False
@@ -923,20 +930,24 @@ if __name__ == "__main__":
     try:
       with open(ser_port) as f: 
         usb_conn = True
-        if not(sn_set):
+        if not(sn_set) and (REV == 2):
           # Get the serial number
           data = rd_eeprom(iicf.ADDR_BOOT_EEPROM_0)
-          rd_ser_num = data[16:21]
-          #Check that serial number is present
-          if not(reduce(lambda x,y:x+y, rd_ser_num) == 0xff*5):
-            sn_set = True
-            sn = {     
-              'manufacturer' : rd_ser_num[0], 
-              'type'         : rd_ser_num[1], 
-              'revision'     : rd_ser_num[2],
-              'batch'        : rd_ser_num[3], 
-              'board'        : rd_ser_num[4] 
-            } 
+          #print len(data)
+          if len(data) == 256:
+            rd_ser_num = data[16:21]
+            #Check that serial number is present
+            if not(reduce(lambda x,y:x+y, rd_ser_num) == 0xff*5):
+              sn_set = True
+              sn = {     
+                'manufacturer' : rd_ser_num[0], 
+                'type'         : rd_ser_num[1], 
+                'revision'     : rd_ser_num[2],
+                'batch'        : rd_ser_num[3], 
+                'board'        : rd_ser_num[4] 
+              } 
+          else:
+            print c.FAIL + "Error: EEPROM could not be read." + c.ENDC
     except IOError:
       # Detect disconnect
       if usb_conn:
@@ -951,21 +962,24 @@ if __name__ == "__main__":
       if usb_disc:
         menu_text = 'ROACH2 Rev %d Testing - ' %REV + c.WARNING + 'USB not connected' + c.ENDC
         col = DEF_C.copy()
+        all_pass = False
         sn_set = False
-        power_teset = False
+        power_test = False
         pb_on = False
         pb_off = False
         print_vc = False
         scan_jtag = False
         prog_eeprom = False
         read_eeprom = False
-        flash_shk = False
+        flash_chk = False
         uboot_load = False
         kernel_load = False
         root_load = False
         cpld_done = False
         qdr_ok = False
+        bsp_ok = False
         sfp_ok = False
+        test_cx = False
         test_usb = False
         uboot_rem = False
         disable_jtag = False
@@ -979,6 +993,8 @@ if __name__ == "__main__":
         menu_refresh = True
         menu_text = 'ROACH2 Rev %d Testing - ' %REV + c.OKGREEN + 'USB connected' + c.ENDC
         os.system('clear')
+      if all_pass:
+        col['a'] = c.OKGREEN
       if sn_set:
         col['1'] = c.OKGREEN
       if power_test:
@@ -997,7 +1013,7 @@ if __name__ == "__main__":
         col['8'] = c.OKGREEN
       if flash_chk:
         col['9'] = c.OKGREEN
-      if uboot_load:
+      if (uboot_load and kernel_load and root_load):
         col['0'] = c.OKGREEN
       elif uboot_rem:
         col['0'] = c.ENDC
@@ -1006,14 +1022,16 @@ if __name__ == "__main__":
         col['w'] = c.OKGREEN
       if qdr_ok:
         col['e'] = c.OKGREEN
-      if test_usb:
+      if bsp_ok:
+        col['r'] = c.OKGREEN
+      if test_cx:
         col['t'] = c.OKGREEN
       if sfp_ok:
         col['y'] = c.OKGREEN
       if disable_jtag:
         col['u'] = c.OKGREEN
-      
-      if print_menu:
+
+      if print_menu and (not run_full):
         manuf_id = sn['manufacturer']
         manuf_name = find_key(defs.MANUF, manuf_id)
         print ''
@@ -1025,6 +1043,7 @@ if __name__ == "__main__":
         print col['1'] + '  Board: %s ' %sn['board'] + c.ENDC
         print ''
         print menu_text
+        print col['a'] + '    a) Run all tests excluding CX4 and SFP+' + c.ENDC
         print col['1'] + '    1) Set serial number for ROACH2' + c.ENDC
         print col['2'] + '    2) Power-up tests, JTAG scan and program EEPROM' + c.ENDC
         print col['3'] + '    3) Switch board on' + c.ENDC
@@ -1037,30 +1056,96 @@ if __name__ == "__main__":
         print col['0'] + '    0) Load U-boot, kernel and filesystem' + c.ENDC
         print col['w'] + '    w) Program CPLD' + c.ENDC
         print col['e'] + '    e) Test QDR memory' + c.ENDC
-        print col['r'] + '    r) Run preliminary DDR3, ZDOK, TGE, 1GE tests' + c.ENDC
-        print col['t'] + '    t) Test PPC USB host' + c.ENDC
+        print col['r'] + '    r) Run DDR3, ZDOK, TGE, 1GE tests' + c.ENDC
+        print col['t'] + '    t) Run CX4 Mezzanine card tests' + c.ENDC
         print col['y'] + '    y) Test SFP+ Cards' + c.ENDC
         print col['u'] + '    u) Disable FTDI JTAG interface' + c.ENDC
         print col['m'] + '    m) Unload U-Boot (if U-Boot does not start correctly and holds the I2C bus).' + c.ENDC
         print col['q'] + '    q) Quit' + c.ENDC
-      answer = getkey()
-      if answer == None:
-        answer = ''
-        print_menu = False
-      else:
-        # Set menu colour to fail, will be set to pass if tests pass.
+
+      if run_full:
         try:
-          col[answer] = c.FAIL
-        except KeyError:
-          print_menu = True
+          if not power_test:
+            answer = ''
+            run_full = False
+            print c.FAIL + '\n\nPower-up, JTAG or EEPROM tests failed.' + c.ENDC
+          elif qdr_ok:
+            answer = ''
+            run_full = False
+            all_pass = True
+            print_menu = True
+            print c.OKGREEN + 'All tests except mezzanine cards passed. Test mezzanine cards seperately.' + c.ENDC
+          elif bsp_ok:
+            if answer == 'e':
+              run_full = False
+              print_menu = True
+              print c.FAIL + '\n\n QDR test errors... check messages above.' + c.ENDC
+            else:
+              answer = 'e'
+          elif cpld_done:
+            if answer == 'r':
+              run_full = False
+              print_menu = True
+              print c.FAIL + '\n\n Board Support Package FPGA tests errors... check messages above.' + c.ENDC
+            else:
+              answer = 'r'
+          elif (root_load and uboot_load and kernel_load):
+            if answer == 'w':
+              run_full = False
+              print_menu = True
+              print c.FAIL + '\n\n CPLD configuration failed... check messages above.' + c.ENDC
+            else:
+              answer = 'w'
+          elif flash_chk:
+            if answer == '0':
+              run_full = False
+              print_menu = True
+              print c.FAIL + '\n\n UBOOT, kernel or root file system loading error... check messages above.' + c.ENDC
+            else:
+              answer = '0' 
+          elif power_test:
+            if answer == '9':
+              run_full = False
+              print_menu = True
+              print c.FAIL + '\n\n Flash or DDR2 memory error... check messages above.' + c.ENDC
+            else:
+              answer = '9'
+          else:
+            run_full = False
+            print c.FAIL + '\n\n Something went wrong, check messages above.' + c.ENDC
+        except KeyboardInterrupt:
+          run_full=False
+      else:
+        answer = getkey()
+        if answer == None:
+          answer = ''
+          print_menu = False
+        else:
+          # Set menu colour to fail, will be set to pass if tests pass.
+          try:
+            answer = answer.lower()
+            col[answer] = c.FAIL
+          except KeyError:
+            print_menu = True
 
       if '1' in answer:
         sn_set = False
         sn = set_serial_number()
         sn_set = True
         print_menu = True
-      elif '2' in answer:
+      elif answer == '2' or answer == 'a':
         print c.OKBLUE + '\n    Testing power, configuring EEPROM and scanning JTAG chain' + c.ENDC
+        if 'a' in answer:
+          #Reset all flags in preparation for the full test
+          all_pass = False
+          run_full = True
+          bsp_ok = False
+          qdr_ok = False
+          cpld_done = False
+          root_load = False
+          uboot_load = False
+          kernel_load = False
+          flash_chk = False
         power_test = False
         if not sn_set:
           print '    WARNING: Serial number not set, press \'1\' to set or any key to use default...'
@@ -1078,6 +1163,11 @@ if __name__ == "__main__":
         test_power()
         program_eeprom(sn)
         scan_jtag_chain()
+        # Here the CPLD is being programmed to ensure the ppc boots in option C. Problems was found on the PPC when running boot option C. The CPLD is not verified, will be verified later. This may need to improve.
+        print '    Erasing CPLD...',
+        load_urj('support_files/erase_cpld.urj')
+        print '    Programming CPLD...',
+        load_urj('support_files/program_cpld.urj')
         power_test = True
         print_menu = True
       elif '3' in answer:
@@ -1187,6 +1277,8 @@ if __name__ == "__main__":
           if not find_str_ser(ser, 'pass', 3)[0]:
             raise Exception, ('FATAL: FLASH memory test failed.')
           print c.OKBLUE + ('\n\n    FLASH memory test passed.\n') + c.ENDC
+          press_pb('off')
+          press_pb('on')
           print '    Loading DDR2 checking program via JTAG, this will take while...'
           if REV == 1:
             file_to_send = defs.UBOOT_REV1_MEMTEST
@@ -1210,29 +1302,33 @@ if __name__ == "__main__":
           print '\n    Clearing PPC.'
           load_ppc('support_files/program.mac')
           flash_chk = True
+        except KeyboardInterrupt:
+          run_full=False
         finally:
           ser.close()
           print_menu = True
       elif '0' in answer:
-        print c.OKBLUE + ('\n    Loading U-Boot, Linux kernel and on board root file system.')
-        print '        Press any key to load all three.'
-        print '        Press 1 to load U-Boot.'
-        print '        Press 2 to load the kernel.'
-        print '        Press 3 to load the root file system.' + c.ENDC
-        answer = getkey_block()
+        print c.OKBLUE + ('\n    Loading U-Boot, Linux kernel and on board root file system.') + c.ENDC
         load_all = False
         load_uboot = False
         load_kernel = False
         load_root = False
-        if '1' in answer:
-          load_uboot = True
-        elif '2' in answer:
-          load_kernel = True
-        elif '3' in answer:
-          load_root = True
-        else:
+        if run_full:
           load_all = True
-
+        else:
+          print '        Press any key to load all three.'
+          print '        Press 1 to load U-Boot.'
+          print '        Press 2 to load the kernel.'
+          print '        Press 3 to load the root file system.'
+          answer = getkey_block()
+          if '1' in answer:
+            load_uboot = True
+          elif '2' in answer:
+            load_kernel = True
+          elif '3' in answer:
+            load_root = True
+          else:
+            load_all = True
         try:
           ser = open_ftdi_uart(ser_port, baud)
         except:
@@ -1286,9 +1382,9 @@ if __name__ == "__main__":
             ser.write('run tftpkernel\n')
             if not find_str_ser(ser, 'Waiting for PHY', 2)[0]:
               raise Exception('ERROR: U-Boot not loaded, load U-Boot before loading kernel.')
-            if not find_str_ser(ser, 'DHCP client bound to address', 60)[0]:
+            if not find_str_ser(ser, 'DHCP client bound to address', 10)[0]:
               raise Exception('ERROR: IP address not assigned, check connections and DHCP server.')
-            if not find_str_ser(ser, 'done\r\n=>', 40)[0]:
+            if not find_str_ser(ser, 'done\r\n=>', 30)[0]:
               raise Exception('ERROR: Kernel did not load.')
             kernel_load = True
           if load_all or load_root:
@@ -1304,9 +1400,9 @@ if __name__ == "__main__":
             ser.write('run tftproot\n')
             if not find_str_ser(ser, 'ENET Speed is', 3)[0]:
               raise Exception('ERROR: U-Boot not loaded, load U-Boot before loading root file system.')
-            if not find_str_ser(ser, 'DHCP client bound to address', 60)[0]:
+            if not find_str_ser(ser, 'DHCP client bound to address', 10)[0]:
               raise Exception('ERROR: IP address not assigned, check connections and DHCP server.')
-            if not find_str_ser(ser, 'done\r\n=>', 5.5*60)[0]:
+            if not find_str_ser(ser, 'done\r\n=>', 60)[0]:
               raise Exception('ERROR: Root file system did not load.')
 
             ser.write('reset\n')
@@ -1361,7 +1457,10 @@ if __name__ == "__main__":
             if not find_str_ser(ser, 'System Halted', 1, True)[0]:
               raise Exception('ERROR: Linux not booted correctly or configuration not updated correctly.')
             print c.OKGREEN + '\n\nROM file system successfully loaded.' + c.ENDC
+            time.sleep(2)
             root_load = True
+        except KeyboardInterrupt:
+          run_full = False
         finally:
           ser.close()
           print_menu = True
@@ -1397,6 +1496,8 @@ if __name__ == "__main__":
             raise Exception, ('FATAL: CPLD did not program correctly.')
           cpld_done = True
           print c.OKBLUE + ('\n\n    CPLD successfully programmed.') + c.ENDC
+        except KeyboardInterrupt:
+          run_full = False
         finally:
           ser.close()
           print_menu = True
@@ -1472,6 +1573,8 @@ if __name__ == "__main__":
             print c.FAIL + 'QDR Tests Failed!' + c.ENDC
           else:
             print c.OKGREEN + 'QDR Tests Passed.' + c.ENDC
+        except KeyboardInterrupt:
+          run_full = False
         finally:
           try: 
             for f in fpga: f.close()
@@ -1484,7 +1587,9 @@ if __name__ == "__main__":
         except:
           raise
         try:
-          print c.OKBLUE + '\n    Running preliminary DDR3, ZDOK, TGE and 1GE tests.' + c.ENDC
+          print c.OKBLUE + '\n    Running DDR3, ZDOK, TGE and 1GE tests.' + c.ENDC
+          bsp_ok = False
+          err_v = ()
           press_pb('off')
           press_pb('on')
           if find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
@@ -1500,28 +1605,87 @@ if __name__ == "__main__":
             ser.write('tftp 100000 roach2_bsp_rev1.bin\n')
           else:
             ser.write('tftp 100000 roach2_bsp_rev2.bin\n')
-          print_outp_ser(ser, 2)
+          if not find_str_ser(ser, 'done', 3, True)[0]:
+            raise Exception('ERROR: bin file not correctly transferred.')
           ser.write('r2smap 100000\n')
-          print_outp_ser(ser, 2)
+          if print_outp_ser(ser, 2).find('error') > -1:
+            raise Exception, ('ERROR: Selectmap programming failed, FPGA not configured.')
           ser.write('r2bit v6comm\n')
-          print_outp_ser(ser, 2)
+          if print_outp_ser(ser, 2).find('FAILED') > -1:
+            err_v = err_v + ('Comm check with FPGA failed',)
           ser.write('r2bit v6gbe\n')
-          print_outp_ser(ser, 2)
+          if print_outp_ser(ser, 2).find('FAILED') > -1:
+            err_v = err_v + ('Gigabit ethernet link test failed.',)
           ser.write('r2bit ddr3\n')
-          print_outp_ser(ser, 2)
-          for i in range(4):
-            ser.write('r2bit qdr %d\n' %i)
-            print_outp_ser(ser, 2)
-          for i in range(8):
-            ser.write('r2bit tge %d\n' %i)
-            print_outp_ser(ser, 2)
+          if print_outp_ser(ser, 2).find('FAILED') > -1:
+            err_v = err_v + ('DDR3 tests failed.',)
+          # QDR tests performed elsewhere
+          #for i in range(4):
+          #  ser.write('r2bit qdr %d\n' %i)
+          #  print_outp_ser(ser, 2)
           for i in range(2):
             ser.write('r2bit zdok %d\n' %i)
-            print_outp_ser(ser, 2)
+            if print_outp_ser(ser, 2).find('FAILED') > -1:
+              err_v = err_v + ('ZDOK loopback test failed for connector %d.' %i,)
+         
+          if len(err_v):
+            print c.FAIL + ('\n\nErrors detected:')
+            for i in err_v:
+              print c.FAIL + i + c.ENDC
+          else:
+            print c.OKGREEN + ('\n\nAll DDR3, ZDOK, TGE and 1GE tests successfull') + c.ENDC
+            bsp_ok = True
+        except KeyboardInterrupt:
+          run_full = False
         finally:
           ser.close()
           print_menu = True
       elif 't' in answer:
+        try:
+          ser = open_ftdi_uart(ser_port, baud)
+        except:
+          raise
+        try:
+          print c.OKBLUE + '\n    Running CX4 Mezzanine card loopback tests.' + c.ENDC
+          test_cx = False
+          err_v = ()
+          press_pb('off')
+          press_pb('on')
+          if find_str_ser(ser, 'stop autoboot:', defs.UBOOT_DELAY, False)[0]:
+            ser.write('\n')
+          else:
+            raise Exception('ERROR: U-Boot did not load correctly.')
+          time.sleep(1)
+          ser.write('dhcp\n')
+          if not find_str_ser(ser, 'Bytes transferred', 10)[0]:
+            raise Exception('DHCP request not successful.')
+          time.sleep(0.5)
+          if REV == 1:
+            ser.write('tftp 100000 roach2_bsp_rev1.bin\n')
+          else:
+            ser.write('tftp 100000 roach2_bsp_rev2.bin\n')
+          if not find_str_ser(ser, 'done', 1, True)[0]:
+            raise Exception('ERROR: bin file not correctly transferred.')
+          ser.write('r2smap 100000\n')
+          if find_str_ser(ser, 'error', 1, True)[0]:
+            raise Exception, ('ERROR: Selectmap programming failed, FPGA not configured.')
+          for i in range(8):
+            ser.write('r2bit tge %d\n' %i)
+            if find_str_ser(ser, 'FAILED', 1, True)[0]:
+              err_v = err_v + ('Ten Gigabit Ethernet link test failed for link %d.' %i,)
+        finally:
+          ser.flushOutput()
+          ser.close()
+          if len(err_v):
+            print c.FAIL + ('\n\nErrors detected:')
+            for i in err_v:
+              print c.FAIL + i + c.ENDC
+          else:
+            print c.OKGREEN + ('\n\nAll TGE CX4 link tests successfull') + c.ENDC
+            test_cx = True
+          print_menu = True
+# USB host does not work reliably on the PPC, this test is not available at present.
+      elif 'i' in answer:
         try:
           ser = open_ftdi_uart(ser_port, baud)
         except:
