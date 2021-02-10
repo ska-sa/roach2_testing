@@ -69,7 +69,8 @@ UBOOT_DELAY = 10
 # Unconfigured current thresholds
 UC_NOM_C_12V = 0.8 
 UC_NOM_C_5V0 = 0.8
-UC_NOM_C_3V3 = 0.14
+#UC_NOM_C_3V3 = 0.14
+UC_NOM_C_3V3 = 2.2
 UC_NOM_C_2V5 = 1.13
 UC_NOM_C_1V8 = 1.2
 UC_NOM_C_1V5 = 2.4
@@ -172,7 +173,8 @@ UBOOT_REV2 = '/home/nfs/roach2/boot/u-boot-r2-rev2.bin'
 UBOOT_REV2_MEMTEST = '/home/nfs/roach2/boot/u-boot-memtest-r2-rev2.bin'
 
 #array of boffiles to test calibration
-QDR_TST_BOF = ['qdr_no_front_delay.bof.gz', 'qdr_tst_r2_2x_2013_Jul_05_0630_0_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_0926_1_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_1131_2_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_0956_3_otaps.bof.gz']
+#QDR_TST_BOF = ['qdr_no_front_delay.bof.gz', 'qdr_tst_r2_2x_2013_Jul_05_0630_0_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_0926_1_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_1131_2_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_0956_3_otaps.bof.gz']
+QDR_TST_BOF = ['qdr_tst_r2_2x_2013_Jul_05_0630_0_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_0926_1_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_1131_2_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_08_0956_3_otaps.bof.gz', 'qdr_tst_r2_2x_2013_Jul_04_1854_4_otaps.bof.gz']
 SFP_PLUS_BOF = 'r2_trans_test_2012_Oct_19_0911.bof'
 # Set xilinx source path
 XILINX_SRC_PATH = '/opt/Xilinx/12.4/LabTools/settings64.sh'

@@ -1444,7 +1444,14 @@ if __name__ == "__main__":
               raise Exception('ERROR: Linux did not boot correctly.')
             print 'loading romfs...',
             sys.stdout.flush()
-            if not find_str_ser(ser, 'login:', 10, False)[0]:
+            timeout = 5
+            found = False
+            while (timeout > 0 and not(found)):
+              found, txt_buff = find_str_ser(ser, 'login:', 30, False)
+              if not(found):
+                ser.write('\n\n')
+                timeout -= 1
+	    if timeout == 0:
               raise Exception('ERROR: Linux did not boot correctly.')
             print 'done.'
             ser.write('root\n')
