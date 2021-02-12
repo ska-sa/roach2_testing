@@ -734,7 +734,8 @@ def get_assigned_ip(ser_obj, bof_file):
   if linux_booted:
     ser_obj.write('\n\n')
     ser_obj.write('ls /boffiles/%s\n'%bof_file)
-    if find_str_ser(ser_obj, 'cannot access', 1, False)[0]:
+    #if find_str_ser(ser_obj, 'cannot access', 1, False)[0]:
+    if find_str_ser(ser_obj, 'No such file or directory', 1, False)[0]:
       linux_booted = False
   if not linux_booted:
     print 'Linux not booted, cycling power and net booting.'
@@ -1551,7 +1552,7 @@ if __name__ == "__main__":
               os.chmod(outpath, 0777)
             except: pass  
             ip_addr = get_assigned_ip(ser, defs.QDR_TST_BOF[i])
-            qdr_ok = qdr_tst.test_qdr(ip_addr, defs.QDR_TST_BOF[i], qdr_log, rd_ser_num, True, 6)
+            qdr_ok = qdr_tst.test_qdr(ip_addr, defs.QDR_TST_BOF[i], qdr_log, rd_ser_num, True, 5)
             if not(qdr_ok):
               # Create a list of bofs that cause calibration errors
               err_list.append(defs.QDR_TST_BOF[i])
@@ -1559,9 +1560,14 @@ if __name__ == "__main__":
               # Do a memory test with the last working bof
               prev_wrk_bof = working_bof
               working_bof = defs.QDR_TST_BOF[i]
-            
+
           # Perform full qdr test if any boffiles passed calibration 
           if len(working_bof):
+            # TCPBorph seems to crash if too many bof files are programmed  
+            press_pb('off')
+            ser.flushInput()
+            ser.flushOutput()
+            ip_addr = get_assigned_ip(ser, defs.QDR_TST_BOF[i])
             if len(prev_wrk_bof):
               qdr_ok = qdr_tst.test_qdr(ip_addr, prev_wrk_bof, qdr_log, rd_ser_num)
             else:
